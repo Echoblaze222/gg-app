@@ -44,23 +44,39 @@ export default function LoginPage() {
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_admin, full_name")
-      .eq("id", authData.user.id)
-      .single();
+   let { data: profile } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("id", authData.user.id)
+  .single();
 
-    if (profileError || !profile) {
-      await supabase.auth.signOut();
+if (!profile) {
+  const { error: insertError } = await supabase
+    .from("profiles")
+    .insert({
+      id: authData.user.id,
+      full_name:
+        authData.user.user_metadata?.full_name ||
+        authData.user.user_metadata?.name ||
+        "Google User",
+      email: authData.user.email,
+      phone: "",
+      is_admin: false,
+      plan_type: "Daily",
+      fixed_amount: 0,
+      trust_score: 100,
+      contribution_streak: 0,
+      total_saved: 0,
+    });
 
-      setError(
-        "Account profile not found. Please register first or contact support."
-      );
+  if (insertError) {
+    setError(insertError.message);
+    setLoading(false);
+    return;
+  }
 
-      setLoading(false);
-      return;
-    }
-
+  profile = { is_admin: false };
+}
     router.push(profile.is_admin ? "/admin" : "/dashboard");
     router.refresh();
   }
