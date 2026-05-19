@@ -26,7 +26,7 @@ export default function RegisterPage() {
     { type: "Monthly", icon: "🗓" },
   ];
 
-   {
+  
     async function handleGoogleRegister() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
