@@ -80,10 +80,11 @@ export default function RegisterPage() {
     });
 
     if (authError || !data.user) {
-      setError(authError?.message || "Registration failed");
-      setLoading(false);
-      return;
-    }
+  console.log(authError);
+  setError(authError?.message || JSON.stringify(authError));
+  setLoading(false);
+  return;
+}
 
     // 2. Save profile
     const { error: profileError } = await supabase
