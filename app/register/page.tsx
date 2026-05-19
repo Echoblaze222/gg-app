@@ -21,10 +21,19 @@ export default function RegisterPage() {
   const [showPass, setShowPass] = useState(false);
 
   const PLANS = [
-    { type: "Daily", icon: "📅", desc: "Save every day" },
-    { type: "Weekly", icon: "📆", desc: "Save every week" },
-    { type: "Monthly", icon: "🗓", desc: "Save every month" },
+    { type: "Daily", icon: "📅" },
+    { type: "Weekly", icon: "📆" },
+    { type: "Monthly", icon: "🗓" },
   ];
+
+  async function handleGoogleRegister() {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://gg-app-3h69.vercel.app/dashboard",
+      },
+    });
+  }
 
   function validateStep1() {
     if (!fullName.trim()) {
@@ -73,20 +82,22 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    // 1. Create auth user
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (authError || !data.user) {
-  console.log(authError);
-  setError(authError?.message || JSON.stringify(authError));
-  setLoading(false);
-  return;
-}
+      console.log(authError);
 
-    // 2. Save profile
+      setError(
+        authError?.message || "Registration failed"
+      );
+
+      setLoading(false);
+      return;
+    }
+
     const { error: profileError } = await supabase
       .from("profiles")
       .insert({
@@ -176,7 +187,6 @@ export default function RegisterPage() {
             animation: "fadeUp 0.5s ease",
           }}
         >
-          {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div
               style={{
@@ -219,7 +229,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Card */}
           <div
             style={{
               background: "rgba(255,255,255,0.04)",
@@ -246,9 +255,14 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* STEP 1 */}
             {step === 1 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                }}
+              >
                 <input
                   type="text"
                   placeholder="Full Name"
@@ -316,8 +330,29 @@ export default function RegisterPage() {
                   type="button"
                   onClick={handleStep1}
                   style={{
-                    background: "linear-gradient(135deg,#007BFF,#0040ff)",
+                    background:
+                      "linear-gradient(135deg,#007BFF,#0040ff)",
                     color: "#fff",
+                    border: "none",
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    width: "100%",
+                    touchAction: "manipulation",
+                  }}
+                >
+                  Continue →
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleRegister}
+                  style={{
+                    width: "100%",
+                    background: "#fff",
+                    color: "#000",
                     border: "none",
                     borderRadius: 12,
                     padding: 14,
@@ -326,14 +361,19 @@ export default function RegisterPage() {
                     cursor: "pointer",
                   }}
                 >
-                  Continue →
+                  Continue with Google
                 </button>
               </div>
             )}
 
-            {/* STEP 2 */}
             {step === 2 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                }}
+              >
                 <select
                   value={planType}
                   onChange={(e) => setPlanType(e.target.value)}
@@ -345,7 +385,7 @@ export default function RegisterPage() {
                       value={plan.type}
                       style={{ background: "#111" }}
                     >
-                      {plan.type}
+                      {plan.icon} {plan.type}
                     </option>
                   ))}
                 </select>
@@ -366,7 +406,8 @@ export default function RegisterPage() {
                       flex: 1,
                       background: "rgba(255,255,255,0.05)",
                       color: "#fff",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      border:
+                        "1px solid rgba(255,255,255,0.1)",
                       borderRadius: 12,
                       padding: 14,
                       cursor: "pointer",
@@ -393,13 +434,14 @@ export default function RegisterPage() {
                       cursor: "pointer",
                     }}
                   >
-                    {loading ? "Creating..." : "Create Account ✓"}
+                    {loading
+                      ? "Creating..."
+                      : "Create Account ✓"}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STEP 3 */}
             {step === 3 && (
               <div
                 style={{
@@ -425,7 +467,8 @@ export default function RegisterPage() {
                   type="button"
                   onClick={() => router.push("/login")}
                   style={{
-                    background: "linear-gradient(135deg,#007BFF,#0040ff)",
+                    background:
+                      "linear-gradient(135deg,#007BFF,#0040ff)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 12,
