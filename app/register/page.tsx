@@ -26,14 +26,19 @@ export default function RegisterPage() {
     { type: "Monthly", icon: "🗓" },
   ];
 
-  async function handleGoogleRegister() {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "https://gg-app-3h69.vercel.app/dashboard",
-      },
-    });
+   {
+    async function handleGoogleRegister() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: "https://gg-app-3h69.vercel.app/dashboard",
+    },
+  });
+
+  if (error) {
+    setError(error.message);
   }
+}
 
   function validateStep1() {
     if (!fullName.trim()) {
