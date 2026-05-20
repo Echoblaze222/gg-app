@@ -5,13 +5,9 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { RealtimePostgresInsertPayload } from "@supabase/realtime-js";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase/client";
 
-const sb = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const sb = createClient();
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -361,7 +357,7 @@ export function useNotifications() {
     // Subscribe to real-time inserts on notifications table
     channelRef.current = sb
       .channel("admin-notifications")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: RealtimePostgresInsertPayload<Record<string, unknown>>) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: { new: Record<string, any> }) => {
         setItems(p => [payload.new as Notification, ...p].slice(0, 50));
       })
       .subscribe();
