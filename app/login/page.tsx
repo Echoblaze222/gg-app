@@ -11,15 +11,48 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
+  // ✅ FIX 1: Proper Google OAuth with loading state, error handling, and account picker
   async function handleGoogleLogin() {
-    await supabase.auth.signInWithOAuth({
+    setError("");
+    setGoogleLoading(true);
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: "https://gg-app-3h69.vercel.app/dashboard",
+        queryParams: {
+          access_type: "offline",
+          prompt: "select_account", // Forces Google account picker every time
+        },
       },
     });
+
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+    // On success: browser redirects — no need to reset loading state
+  }
+
+  // ✅ FIX 5: Forgot password handler
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Enter your email address above, then click Forgot Password.");
+      return;
+    }
+    setError("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://gg-app-3h69.vercel.app/reset-password",
+    });
+    if (error) {
+      setError(error.message);
+    } else {
+      setResetSent(true);
+    }
   }
 
   async function handleLogin() {
@@ -33,10 +66,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      await supabase.auth.signInWithPassword({ email, password });
 
     if (authError || !authData.user) {
       setError(authError?.message ?? "Incorrect email or password.");
@@ -44,41 +74,26 @@ export default function LoginPage() {
       return;
     }
 
-   let { data: profile } = await supabase
-  .from("profiles")
-  .select("*")
-  .eq("id", authData.user.id)
-  .single();
+    // ✅ FIX 2: Fetch profile — do NOT auto-insert on email/password login.
+    // If profile is missing, show a clear error instead of inserting blank data.
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", authData.user.id)
+      .single();
 
-if (!profile) {
-  const { error: insertError } = await supabase
-    .from("profiles")
-    .insert({
-      id: authData.user.id,
-      full_name:
-        authData.user.user_metadata?.full_name ||
-        authData.user.user_metadata?.name ||
-        "Google User",
-      email: authData.user.email,
-      phone: "",
-      is_admin: false,
-      plan_type: "Daily",
-      fixed_amount: 0,
-      trust_score: 100,
-      contribution_streak: 0,
-      total_saved: 0,
-    });
+    if (profileError || !profile) {
+      setError(
+        "Your profile could not be found. Please contact support or re-register."
+      );
+      // Sign them back out so they're not stuck in a half-authenticated state
+      await supabase.auth.signOut();
+      setLoading(false);
+      return;
+    }
 
-  if (insertError) {
-    setError(insertError.message);
-    setLoading(false);
-    return;
-  }
-
-  profile = { is_admin: false };
-}
+    // ✅ FIX 3 & 4: Only push after all checks pass; removed redundant router.refresh()
     router.push(profile.is_admin ? "/admin" : "/dashboard");
-    router.refresh();
   }
 
   const inputStyle: React.CSSProperties = {
@@ -117,7 +132,6 @@ if (!profile) {
             opacity: 0;
             transform: translateY(20px);
           }
-
           to {
             opacity: 1;
             transform: translateY(0);
@@ -172,7 +186,7 @@ if (!profile) {
                 color: "#fff",
               }}
             >
-              God's Grace
+              God&apos;s Grace
             </div>
 
             <div
@@ -184,7 +198,7 @@ if (!profile) {
                 marginTop: 4,
               }}
             >
-              Fintech · Thrift & Ajo
+              Fintech · Thrift &amp; Ajo
             </div>
           </div>
 
@@ -222,6 +236,7 @@ if (!profile) {
               Sign in to your savings account
             </div>
 
+            {/* Error Banner */}
             {error && (
               <div
                 style={{
@@ -238,13 +253,24 @@ if (!profile) {
               </div>
             )}
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
+            {/* Password Reset Confirmation */}
+            {resetSent && (
+              <div
+                style={{
+                  background: "rgba(0,200,100,0.1)",
+                  border: "1px solid rgba(0,200,100,0.3)",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  marginBottom: 18,
+                  fontSize: 13,
+                  color: "#00c864",
+                }}
+              >
+                ✅ Password reset email sent — check your inbox.
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Email */}
               <div>
                 <label
@@ -265,27 +291,45 @@ if (!profile) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && handleLogin()
-                  }
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   style={inputStyle}
                 />
               </div>
 
               {/* Password */}
               <div>
-                <label
+                <div
                   style={{
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.4)",
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    display: "block",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     marginBottom: 8,
                   }}
                 >
-                  Password
-                </label>
+                  <label
+                    style={{
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.4)",
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Password
+                  </label>
+
+                  {/* ✅ FIX 5: Forgot password link */}
+                  <span
+                    onClick={handleForgotPassword}
+                    style={{
+                      fontSize: 12,
+                      color: "#007BFF",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Forgot password?
+                  </span>
+                </div>
 
                 <div style={{ position: "relative" }}>
                   <input
@@ -293,13 +337,8 @@ if (!profile) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && handleLogin()
-                    }
-                    style={{
-                      ...inputStyle,
-                      padding: "13px 48px 13px 16px",
-                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                    style={{ ...inputStyle, padding: "13px 48px 13px 16px" }}
                   />
 
                   <button
@@ -322,7 +361,7 @@ if (!profile) {
                 </div>
               </div>
 
-              {/* Login Button */}
+              {/* Sign In Button */}
               <button
                 type="button"
                 onClick={handleLogin}
@@ -331,9 +370,7 @@ if (!profile) {
                   background: loading
                     ? "rgba(255,255,255,0.06)"
                     : "linear-gradient(135deg,#007BFF,#0040ff)",
-                  color: loading
-                    ? "rgba(255,255,255,0.3)"
-                    : "#fff",
+                  color: loading ? "rgba(255,255,255,0.3)" : "#fff",
                   border: "none",
                   borderRadius: 12,
                   padding: 14,
@@ -341,9 +378,7 @@ if (!profile) {
                   fontWeight: 700,
                   cursor: loading ? "not-allowed" : "pointer",
                   fontFamily: "inherit",
-                  boxShadow: loading
-                    ? "none"
-                    : "0 4px 24px #007BFF44",
+                  boxShadow: loading ? "none" : "0 4px 24px #007BFF44",
                   marginTop: 4,
                   transition: "all 0.2s",
                   width: "100%",
@@ -354,24 +389,44 @@ if (!profile) {
                 {loading ? "Signing in…" : "Sign In →"}
               </button>
 
-              {/* Google Button */}
+              {/* ✅ FIX 1: Google Button with icon, loading state, proper branding */}
               <button
                 type="button"
                 onClick={handleGoogleLogin}
+                disabled={googleLoading}
                 style={{
                   width: "100%",
-                  background: "#fff",
-                  color: "#000",
-                  border: "none",
+                  background: googleLoading ? "#e8e8e8" : "#fff",
+                  color: "#3c4043",
+                  border: "1px solid #dadce0",
                   borderRadius: 12,
                   padding: 14,
                   fontSize: 15,
-                  fontWeight: 700,
-                  cursor: "pointer",
+                  fontWeight: 600,
+                  cursor: googleLoading ? "not-allowed" : "pointer",
                   marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  transition: "background 0.2s",
+                  touchAction: "manipulation",
                 }}
               >
-                Continue with Google
+                {googleLoading ? (
+                  <span style={{ opacity: 0.6 }}>Redirecting…</span>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 48 48">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                      <path fill="none" d="M0 0h48v48H0z"/>
+                    </svg>
+                    Continue with Google
+                  </>
+                )}
               </button>
 
               <div
@@ -382,7 +437,7 @@ if (!profile) {
                   paddingTop: 4,
                 }}
               >
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <a
                   href="/register"
                   style={{
