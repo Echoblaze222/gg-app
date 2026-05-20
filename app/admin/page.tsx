@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import AdminSettings from "@/components/AdminSettings";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "₦" + (n / 100).toLocaleString("en-NG");
@@ -141,6 +142,7 @@ export default function AdminDashboard() {
   const [defaulters,   setDefaulters]   = useState(INITIAL_DEFAULTERS);
   const [users,        setUsers]        = useState(MOCK_ALL_USERS);
   const [adminName,    setAdminName]    = useState("Admin");
+  const [adminId,      setAdminId]      = useState("");
   const [loading,      setLoading]      = useState<Record<string, boolean>>({});
   const [search,       setSearch]       = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -153,6 +155,7 @@ export default function AdminDashboard() {
     const user = JSON.parse(stored);
     if (!user.is_admin) { router.push("/dashboard"); return; }
     setAdminName(user.full_name ?? "Admin");
+    setAdminId(user.id ?? "");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -218,7 +221,7 @@ export default function AdminDashboard() {
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const TABS = ["Overview", "Payouts", "Defaulters", "All Members", "Audit Log"];
+  const TABS = ["Overview", "Payouts", "Defaulters", "Members", "Audit Log", "Settings"];
 
   const filteredPayouts = filterStatus === "All"
     ? payouts
@@ -863,7 +866,11 @@ export default function AdminDashboard() {
                 })}
               </Card>
             </div>
-          )}
+          )} {tab === "Settings" && (
+  <div className="sec">
+    <AdminSettings adminId={adminId} onToast={(msg) => push(msg)}/>
+  </div>
+)}
 
         </main>
       </div>
