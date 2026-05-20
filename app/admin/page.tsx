@@ -1,649 +1,477 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+/**
+ * app/admin/page.tsx — God's Grace Admin Dashboard
+ *
+ * ✅ Real-time notifications via Supabase Realtime channel
+ * ✅ Full payout approval workflow (Pending → Approved → Completed)
+ * ✅ Balance-aware: shows member balance alongside every payout
+ * ✅ Defaulter management with trust score visibility
+ * ✅ Audit log written to DB on every action
+ * ✅ NO loop: useEffect([]) runs once; router.replace not push
+ */
+import { useState, useCallback } from "react";
+import { useAuthGuard } from "@/lib/auth-guard";
 import { useRouter } from "next/navigation";
-import AdminSettings from "@/components/AdminSettings";
+import {
+  useAdminStats, useAllPayouts, useAllMembers,
+  useDefaulters, useAuditLog, useNotifications,
+  dbApprovePayout, dbExecutePayout, dbRejectPayout,
+  dbSuspendUser, dbRestoreUser,
+  type Payout, type Profile, type AuditLog, type Notification,
+} from "@/lib/hooks/gg";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "₦" + (n / 100).toLocaleString("en-NG");
-
-// ── MOCK DATA ─────────────────────────────────────────────────────────────────
-const MOCK_ADMIN_STATS = {
-  total_float:          487200000,
-  active_plans:         134,
-  defaulter_count:      8,
-  payouts_today:        3,
-  total_users:          142,
-  payouts_today_amount: 15500000,
+const ago = (iso: string) => {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short" });
 };
 
-const MOCK_ALL_USERS = [
-  { id: "u1", full_name: "Adaeze Okonkwo", email: "adaeze@example.com", phone: "08123456789", trust_score: 87, contribution_streak: 14, total_saved: 18450000, plan_type: "Daily", fixed_amount: 500000,  status: "Active"    },
-  { id: "u2", full_name: "Emeka Nwosu",    email: "emeka@example.com",  phone: "08098765432", trust_score: 72, contribution_streak: 6,  total_saved: 7200000,  plan_type: "Daily", fixed_amount: 300000,  status: "Active"    },
-  { id: "u3", full_name: "Ngozi Eze",      email: "ngozi@example.com",  phone: "08055512345", trust_score: 95, contribution_streak: 22, total_saved: 32100000, plan_type: "Daily", fixed_amount: 1000000, status: "Active"    },
-  { id: "u4", full_name: "Bola Adeyemi",   email: "bola@example.com",   phone: "08011122233", trust_score: 62, contribution_streak: 2,  total_saved: 4500000,  plan_type: "Daily", fixed_amount: 200000,  status: "Active"    },
-  { id: "u5", full_name: "Tunde Fashola",  email: "tunde@example.com",  phone: "08033344455", trust_score: 55, contribution_streak: 1,  total_saved: 2100000,  plan_type: "Daily", fixed_amount: 150000,  status: "Active"    },
-  { id: "u6", full_name: "Kemi Williams",  email: "kemi@example.com",   phone: "08077788899", trust_score: 40, contribution_streak: 0,  total_saved: 900000,   plan_type: "Daily", fixed_amount: 100000,  status: "Suspended" },
-];
+const AUDIT_META: Record<string, { label: string; color: string; icon: string }> = {
+  approve_payout:   { label: "Approved Payout",   color: "#00e676", icon: "✅" },
+  reject_payout:    { label: "Rejected Payout",   color: "#ff5252", icon: "❌" },
+  execute_transfer: { label: "Executed Transfer",  color: "#60a5fa", icon: "💸" },
+  send_alert:       { label: "Sent Alert",         color: "#ff9800", icon: "📲" },
+  suspend_user:     { label: "Suspended User",     color: "#ff5252", icon: "⛔" },
+  restore_user:     { label: "Restored User",      color: "#00e676", icon: "✅" },
+};
 
-const INITIAL_PAYOUTS = [
-  { id: "pay4", amount: 8000000, dest_bank: "First Bank",  dest_account: "3344556677", status: "Pending",   otp_verified: true, user: { full_name: "Ngozi Eze",      email: "ngozi@example.com",  phone: "08055512345" }, requested_at: "2025-04-29T08:00:00" },
-  { id: "pay3", amount: 5000000, dest_bank: "GTBank",      dest_account: "0123456789", status: "Pending",   otp_verified: true, user: { full_name: "Emeka Nwosu",    email: "emeka@example.com",  phone: "08098765432" }, requested_at: "2025-04-28T14:00:00" },
-  { id: "pay2", amount: 3000000, dest_bank: "Zenith Bank", dest_account: "9876543210", status: "Approved",  otp_verified: true, user: { full_name: "Adaeze Okonkwo", email: "adaeze@example.com", phone: "08123456789" }, requested_at: "2025-04-27T10:00:00" },
-  { id: "pay1", amount: 7500000, dest_bank: "UBA",         dest_account: "1122334455", status: "Completed", otp_verified: true, user: { full_name: "Bola Adeyemi",   email: "bola@example.com",   phone: "08011122233" }, requested_at: "2025-04-25T09:00:00" },
-];
+const NOTIF_ICON: Record<string, string> = {
+  new_contribution: "💰",
+  payout_request:   "📤",
+  defaulter:        "⚠️",
+};
 
-const INITIAL_DEFAULTERS = [
-  { id: "d1", full_name: "Bola Adeyemi",  days_missed: 5, trust_score: 62, phone: "08011122233" },
-  { id: "d2", full_name: "Tunde Fashola", days_missed: 4, trust_score: 55, phone: "08033344455" },
-  { id: "d3", full_name: "Kemi Williams", days_missed: 3, trust_score: 40, phone: "08077788899" },
-];
+// ── THEME ─────────────────────────────────────────────────────────────────────
+const G = {
+  bg:     "#040a06",
+  card:   "rgba(255,255,255,0.035)",
+  border: "rgba(255,255,255,0.07)",
+  muted:  "rgba(255,255,255,0.38)",
+  green:  "#00e676",
+  red:    "#ff5252",
+  blue:   "#60a5fa",
+  amber:  "#ff9800",
+  gold:   "#f5c518",
+};
 
-// ── LOGO ─────────────────────────────────────────────────────────────────────
-function GGLogo({ size = 38 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="lgBg" x1="0" y1="0" x2="38" y2="38" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0d3d1f"/>
-          <stop offset="100%" stopColor="#051508"/>
-        </linearGradient>
-        <linearGradient id="lgGold" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f5d060"/>
-          <stop offset="100%" stopColor="#b8820a"/>
-        </linearGradient>
-      </defs>
-      <rect width="38" height="38" rx="11" fill="url(#lgBg)"/>
-      <rect width="38" height="38" rx="11" fill="none" stroke="#c8960a" strokeWidth="1" opacity="0.5"/>
-      <text x="19" y="25" textAnchor="middle" fontSize="17" fontWeight="900" fontFamily="Georgia,serif" fill="url(#lgGold)">GG</text>
-    </svg>
-  );
-}
-
-// ── TOAST HOOK ────────────────────────────────────────────────────────────────
+// ── TOAST ─────────────────────────────────────────────────────────────────────
 function useToast() {
-  const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
-  const push = useCallback((msg: string) => {
+  const [toasts, setToasts] = useState<{ id: number; msg: string; ok: boolean }[]>([]);
+  const push = useCallback((msg: string, ok = true) => {
     const id = Date.now();
-    setToasts(p => [{ id, msg }, ...p].slice(0, 3));
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
+    setToasts(p => [{ id, msg, ok }, ...p].slice(0, 3));
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
   }, []);
   return { toasts, push };
 }
 
-// ── REUSABLE UI ───────────────────────────────────────────────────────────────
-function Card({ children, className = "", style = {} }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
-  return (
-    <div className={`gg-card ${className}`} style={style}>
-      {children}
-    </div>
-  );
+// ── SMALL UI ──────────────────────────────────────────────────────────────────
+function Card({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <div style={{ background: G.card, border: `1px solid ${G.border}`, borderRadius: 22, backdropFilter: "blur(20px)", padding: 22, boxShadow: "0 8px 40px rgba(0,0,0,0.35)", ...style }}>{children}</div>;
 }
 
-function Badge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    Pending:   "badge-warning",
-    Approved:  "badge-info",
-    Completed: "badge-success",
-    Active:    "badge-success",
-    Suspended: "badge-danger",
-    Rejected:  "badge-danger",
+function Sk({ w = "100%", h = 18, r = 8 }: { w?: string | number; h?: number; r?: number }) {
+  return <div style={{ width: w, height: h, borderRadius: r, background: "linear-gradient(90deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.6s linear infinite" }}/>;
+}
+
+function Badge({ s }: { s: string }) {
+  const M: Record<string, [string, string]> = {
+    Pending:   ["rgba(255,152,0,0.1)",  G.amber],
+    Approved:  ["rgba(96,165,250,0.1)", G.blue],
+    Completed: ["rgba(0,230,118,0.1)",  G.green],
+    Rejected:  ["rgba(255,64,64,0.1)",  G.red],
+    Active:    ["rgba(0,230,118,0.1)",  G.green],
+    Suspended: ["rgba(255,64,64,0.1)",  G.red],
+    Pending_:  ["rgba(255,152,0,0.1)",  G.amber],
   };
-  return <span className={`badge ${map[status] ?? "badge-neutral"}`}>{status}</span>;
+  const [bg, fg] = M[s] ?? ["rgba(255,255,255,0.06)", G.muted];
+  return <span style={{ background: bg, color: fg, border: `1px solid ${fg}44`, borderRadius: 99, padding: "3px 10px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>;
 }
 
-function Btn({ label, variant, onClick, loading, size = "md" }: {
-  label: string; variant: "success" | "danger" | "info" | "warning" | "ghost";
-  onClick: () => void; loading?: boolean; size?: "sm" | "md";
+function Av({ name }: { name: string }) {
+  const i = name.split(" ").map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
+  return <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: "linear-gradient(135deg,rgba(0,230,118,0.15),rgba(0,230,118,0.04))", border: "1px solid rgba(0,230,118,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: G.green, fontFamily: "'Syne',sans-serif" }}>{i}</div>;
+}
+
+function TBar({ score }: { score: number }) {
+  const c = score >= 80 ? G.green : score >= 50 ? G.amber : G.red;
+  return <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)", overflow: "hidden", marginTop: 5 }}><div style={{ height: "100%", width: `${score}%`, background: c, borderRadius: 99, transition: "width 0.4s ease" }}/></div>;
+}
+
+function Btn({ label, variant, onClick, loading, sm }: {
+  label: string;
+  variant: "success" | "danger" | "info" | "warning" | "ghost";
+  onClick: () => void; loading?: boolean; sm?: boolean;
 }) {
+  const V: Record<string, [string, string, string]> = {
+    success: ["rgba(0,230,118,0.1)",   G.green,  "rgba(0,230,118,0.25)"],
+    danger:  ["rgba(255,64,64,0.1)",   G.red,    "rgba(255,64,64,0.25)"],
+    info:    ["rgba(96,165,250,0.1)",  G.blue,   "rgba(96,165,250,0.25)"],
+    warning: ["rgba(255,152,0,0.1)",   G.amber,  "rgba(255,152,0,0.25)"],
+    ghost:   ["rgba(255,255,255,0.05)","rgba(255,255,255,0.6)","rgba(255,255,255,0.1)"],
+  };
+  const [bg, fg, border] = V[variant];
   return (
-    <button className={`btn btn-${variant} btn-${size}`} onClick={onClick} disabled={loading}>
-      {loading ? <span className="spinner"/> : label}
+    <button onClick={onClick} disabled={loading} style={{ background: bg, color: fg, border: `1px solid ${border}`, borderRadius: 9, padding: sm ? "6px 12px" : "8px 16px", fontSize: sm ? 11 : 12, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.5 : 1, transition: "all 0.18s", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }}>
+      {loading ? <span style={{ width: 11, height: 11, borderRadius: 99, border: `2px solid ${fg}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite", display: "inline-block" }}/> : label}
     </button>
   );
 }
 
-function StatCard({ label, value, sub, icon, accent }: {
-  label: string; value: string | number; sub?: string; icon: string; accent: string;
+function Empty({ emoji, title, desc }: { emoji: string; title?: string; desc: string }) {
+  return <div style={{ textAlign: "center", padding: "40px 0" }}><div style={{ fontSize: 36, marginBottom: 10 }}>{emoji}</div>{title && <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{title}</div>}<div style={{ fontSize: 12, color: G.muted }}>{desc}</div></div>;
+}
+
+function StatCard({ label, value, sub, icon, accent, loading }: {
+  label: string; value: string | number; sub?: string;
+  icon: string; accent: string; loading?: boolean;
 }) {
   return (
-    <div className="stat-card" style={{ "--accent": accent } as React.CSSProperties}>
-      <div className="stat-icon">{icon}</div>
-      <div className="stat-body">
-        <div className="stat-label">{label}</div>
-        <div className="stat-value">{value}</div>
-        {sub && <div className="stat-sub">{sub}</div>}
-      </div>
-      <div className="stat-glow"/>
+    <div style={{ flex: 1, minWidth: 130, position: "relative", overflow: "hidden", background: G.card, border: `1px solid ${G.border}`, borderRadius: 22, padding: "20px 18px", boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
+      <div style={{ fontSize: 22, marginBottom: 10 }}>{icon}</div>
+      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: 1.4, color: G.muted, marginBottom: 6, fontWeight: 600 }}>{label}</div>
+      {loading ? <Sk w={80} h={24}/> : <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "'Syne',sans-serif", lineHeight: 1 }}>{value}</div>}
+      {sub && !loading && <div style={{ fontSize: 11, color: accent, marginTop: 5, fontWeight: 600 }}>{sub}</div>}
+      <div style={{ position: "absolute", bottom: -20, right: -20, width: 80, height: 80, borderRadius: 99, background: accent, opacity: 0.06, filter: "blur(24px)" }}/>
     </div>
   );
 }
 
-function Avatar({ name }: { name: string }) {
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  return <div className="avatar">{initials}</div>;
-}
-
-function TrustBar({ score }: { score: number }) {
-  const color = score >= 80 ? "#00e676" : score >= 50 ? "#ff9800" : "#ff5252";
+function GGLogo() {
   return (
-    <div className="trust-bar-wrap">
-      <div className="trust-bar-fill" style={{ width: `${score}%`, background: color }}/>
+    <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+      <defs>
+        <linearGradient id="aBg" x1="0" y1="0" x2="38" y2="38" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#0d3d1f"/><stop offset="100%" stopColor="#051508"/></linearGradient>
+        <linearGradient id="aGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f5d060"/><stop offset="100%" stopColor="#b8820a"/></linearGradient>
+      </defs>
+      <rect width="38" height="38" rx="11" fill="url(#aBg)"/>
+      <rect width="38" height="38" rx="11" fill="none" stroke="#c8960a" strokeWidth="1" opacity="0.5"/>
+      <text x="19" y="26" textAnchor="middle" fontSize="17" fontWeight="900" fontFamily="Georgia,serif" fill="url(#aGold)">GG</text>
+    </svg>
+  );
+}
+
+// ── REJECT MODAL ──────────────────────────────────────────────────────────────
+function RejectModal({ payout, onClose, onConfirm }: {
+  payout: Payout;
+  onClose: () => void;
+  onConfirm: (note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ width: "100%", maxWidth: 420, background: "#0a1a0c", border: `1px solid ${G.border}`, borderRadius: 24, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
+        <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif", marginBottom: 4, color: G.red }}>Reject Payout</div>
+        <div style={{ fontSize: 12, color: G.muted, marginBottom: 20 }}>
+          {payout.user?.full_name} · {fmt(payout.amount)} → {payout.dest_bank}
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Reason (shown to member)</div>
+          <textarea
+            value={note} onChange={e => setNote(e.target.value)}
+            placeholder="e.g. Account details could not be verified…"
+            rows={3}
+            style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${G.border}`, borderRadius: 11, padding: "12px 14px", color: "#f0f0f0", fontSize: 13, outline: "none", fontFamily: "inherit", resize: "vertical" }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <Btn label="Cancel" variant="ghost" onClick={onClose}/>
+          <Btn label="✗ Reject Payout" variant="danger" onClick={() => onConfirm(note)}/>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
-export default function AdminDashboard() {
+// ── NOTIFICATION PANEL ────────────────────────────────────────────────────────
+function NotifPanel({ items, onMarkRead, onClose }: {
+  items: Notification[];
+  onMarkRead: (ids: string[]) => void;
+  onClose: () => void;
+}) {
+  const unreadIds = items.filter(n => !n.is_read).map(n => n.id);
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 500 }} onClick={onClose}>
+      <div
+        style={{ position: "absolute", top: 65, right: 16, width: 340, maxHeight: "70vh", overflow: "hidden auto", background: "#0a1a0c", border: `1px solid ${G.border}`, borderRadius: 20, boxShadow: "0 20px 60px rgba(0,0,0,0.8)", display: "flex", flexDirection: "column" }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px", borderBottom: `1px solid ${G.border}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Notifications</div>
+          {unreadIds.length > 0 && (
+            <button onClick={() => onMarkRead(unreadIds)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: G.green, fontFamily: "inherit", fontWeight: 700 }}>
+              Mark all read
+            </button>
+          )}
+        </div>
+        {items.length === 0
+          ? <div style={{ padding: "30px", textAlign: "center", color: G.muted, fontSize: 13 }}>No notifications yet</div>
+          : items.map(n => (
+              <div key={n.id} onClick={() => !n.is_read && onMarkRead([n.id])} style={{ display: "flex", gap: 12, padding: "14px 18px", borderBottom: `1px solid ${G.border}`, background: n.is_read ? "transparent" : "rgba(0,230,118,0.03)", cursor: "pointer", transition: "background 0.2s" }}>
+                <div style={{ fontSize: 20, flexShrink: 0 }}>{NOTIF_ICON[n.type] ?? "🔔"}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: n.is_read ? 500 : 700 }}>{n.title}</div>
+                  {n.body && <div style={{ fontSize: 12, color: G.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 3, fontFamily: "'DM Mono',monospace" }}>{ago(n.created_at)}</div>
+                </div>
+                {!n.is_read && <div style={{ width: 7, height: 7, borderRadius: 99, background: G.green, flexShrink: 0, marginTop: 4 }}/>}
+              </div>
+            ))
+        }
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
+export default function AdminPage() {
   const router = useRouter();
   const { toasts, push } = useToast();
 
-  const [tab,          setTab]          = useState("Overview");
-  const [payouts,      setPayouts]      = useState(INITIAL_PAYOUTS);
-  const [defaulters,   setDefaulters]   = useState(INITIAL_DEFAULTERS);
-  const [users,        setUsers]        = useState(MOCK_ALL_USERS);
-  const [adminName,    setAdminName]    = useState("Admin");
-  const [adminId,      setAdminId]      = useState("");
-  const [loading,      setLoading]      = useState<Record<string, boolean>>({});
-  const [search,       setSearch]       = useState("");
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [sidebarOpen,  setSidebarOpen]  = useState(false);
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const [authReady, setAuthReady] = useState(false);
+  const [adminName, setAdminName] = useState("");
+  const [adminId,   setAdminId]   = useState("");
 
-  // ── Auth guard — stable deps, runs once ──────────────────────────────────
+  // Auth guard — runs ONCE, no loop
   useEffect(() => {
-    const stored = localStorage.getItem("gg_user");
-    if (!stored) { router.push("/login"); return; }
-    const user = JSON.parse(stored);
-    if (!user.is_admin) { router.push("/dashboard"); return; }
-    setAdminName(user.full_name ?? "Admin");
-    setAdminId(user.id ?? "");
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const { userId, displayName, ready, logout } = useAuthGuard("admin");
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
-  const setLoad = (id: string, val: boolean) => setLoading(p => ({ ...p, [id]: val }));
+if (!ready) return null;
 
-  function handleLogout() {
-    localStorage.removeItem("gg_user");
-    router.push("/login");
+  // ── Data hooks ────────────────────────────────────────────────────────────
+  const statsHook  = useAdminStats();
+  const payHook    = useAllPayouts();
+  const membHook   = useAllMembers();
+  const defHook    = useDefaulters();
+  const auditHook  = useAuditLog();
+  const notifHook  = useNotifications(); // real-time via Supabase channel
+
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [tab,         setTab]         = useState("Overview");
+  const [filter,      setFilter]      = useState("All");
+  const [search,      setSearch]      = useState("");
+  const [busy,        setBusy]        = useState<Record<string, boolean>>({});
+  const [showNotif,   setShowNotif]   = useState(false);
+  const [rejectTarget,setRejectTarget]= useState<Payout | null>(null);
+
+  const go = (key: string, v: boolean) => setBusy(p => ({ ...p, [key]: v }));
+  const logout = () => { localStorage.removeItem("gg_user"); router.replace("/login"); };
+
+  // ── Payout actions ────────────────────────────────────────────────────────
+  async function approve(p: Payout) {
+    go(p.id, true);
+    try {
+      await dbApprovePayout(p.id, adminId);
+      payHook.updateStatus(p.id, "Approved");
+      push(`✅ Approved payout for ${p.user?.full_name}`);
+    } catch { push("❌ Approval failed", false); }
+    finally { go(p.id, false); }
   }
 
-  function approvePayout(id: string) {
-    setLoad(id, true);
-    setTimeout(() => {
-      setPayouts(p => p.map(x => x.id === id ? { ...x, status: "Approved" } : x));
-      push("✅ Payout approved");
-      setLoad(id, false);
-    }, 1000);
+  async function execute(p: Payout) {
+    go(`ex_${p.id}`, true);
+    try {
+      await dbExecutePayout(p.id, adminId);
+      payHook.updateStatus(p.id, "Completed");
+      statsHook.refetch();
+      push(`💸 Transfer executed — ${fmt(p.amount)} to ${p.user?.full_name}`);
+    } catch { push("❌ Transfer failed", false); }
+    finally { go(`ex_${p.id}`, false); }
   }
 
-  function executePayout(id: string) {
-    setLoad(`exec_${id}`, true);
-    setTimeout(() => {
-      setPayouts(p => p.map(x => x.id === id ? { ...x, status: "Completed" } : x));
-      push("💸 Transfer executed");
-      setLoad(`exec_${id}`, false);
-    }, 1500);
+  async function confirmReject(note: string) {
+    if (!rejectTarget) return;
+    go(`rj_${rejectTarget.id}`, true);
+    try {
+      await dbRejectPayout(rejectTarget.id, adminId, note);
+      payHook.updateStatus(rejectTarget.id, "Rejected");
+      push(`❌ Payout rejected`);
+    } catch { push("❌ Rejection failed", false); }
+    finally { go(`rj_${rejectTarget.id}`, false); setRejectTarget(null); }
   }
 
-  function rejectPayout(id: string) {
-    setLoad(`rej_${id}`, true);
-    setTimeout(() => {
-      setPayouts(p => p.map(x => x.id === id ? { ...x, status: "Rejected" } : x));
-      push("❌ Payout rejected");
-      setLoad(`rej_${id}`, false);
-    }, 800);
+  // ── User actions ──────────────────────────────────────────────────────────
+  async function suspend(u: Profile) {
+    go(`su_${u.id}`, true);
+    try {
+      await dbSuspendUser(u.id, adminId);
+      membHook.updateStatus(u.id, "Suspended");
+      defHook.remove(u.id);
+      push(`⛔ ${u.full_name} suspended`);
+    } catch { push("❌ Suspend failed", false); }
+    finally { go(`su_${u.id}`, false); }
   }
 
-  function sendAlert(id: string, name: string) {
-    setLoad(`alert_${id}`, true);
-    setTimeout(() => {
-      push(`📲 Alert sent to ${name}`);
-      setLoad(`alert_${id}`, false);
-    }, 900);
+  async function restore(u: Profile) {
+    go(`rs_${u.id}`, true);
+    try {
+      await dbRestoreUser(u.id, adminId);
+      membHook.updateStatus(u.id, "Active");
+      push(`✅ ${u.full_name} restored`);
+    } catch { push("❌ Restore failed", false); }
+    finally { go(`rs_${u.id}`, false); }
   }
 
-  function suspendUser(id: string) {
-    setLoad(`sus_${id}`, true);
-    setTimeout(() => {
-      setDefaulters(p => p.filter(d => d.id !== id));
-      setUsers(p => p.map(u => u.id === id ? { ...u, status: "Suspended" } : u));
-      push("⛔ Plan suspended");
-      setLoad(`sus_${id}`, false);
-    }, 1000);
-  }
-
-  function restoreUser(id: string) {
-    setLoad(`res_${id}`, true);
-    setTimeout(() => {
-      setUsers(p => p.map(u => u.id === id ? { ...u, status: "Active" } : u));
-      push("✅ User restored");
-      setLoad(`res_${id}`, false);
-    }, 800);
-  }
-
-  // ── Derived state ─────────────────────────────────────────────────────────
-  const TABS = ["Overview", "Payouts", "Defaulters", "Members", "Audit Log", "Settings"];
-
-  const filteredPayouts = filterStatus === "All"
-    ? payouts
-    : payouts.filter(p => p.status === filterStatus);
-
-  const filteredUsers = users.filter(u =>
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const TABS         = ["Overview", "Payouts", "Defaulters", "Members", "Audit Log"];
+  const filteredPay  = filter === "All" ? payHook.items : payHook.items.filter(p => p.status === filter);
+  const filteredMemb = membHook.items.filter(u =>
     u.full_name.toLowerCase().includes(search.toLowerCase()) ||
     u.email.toLowerCase().includes(search.toLowerCase())
   );
-
-  const auditLog = [
-    { action: "approve_payout",   admin: adminName, target: "Adaeze Okonkwo — ₦30,000", time: "Today 14:32"     },
-    { action: "execute_transfer", admin: adminName, target: "Bola Adeyemi — ₦75,000",   time: "Today 12:10"     },
-    { action: "send_alert",       admin: adminName, target: "Tunde Fashola",             time: "Today 09:45"     },
-    { action: "suspend_plan",     admin: adminName, target: "Kemi Williams",             time: "Yesterday 16:20" },
-    { action: "approve_payout",   admin: adminName, target: "Emeka Nwosu — ₦50,000",    time: "Yesterday 11:05" },
-  ];
-
-  const auditMeta: Record<string, { label: string; color: string }> = {
-    approve_payout:   { label: "Approved Payout",    color: "#00e676" },
-    execute_transfer: { label: "Executed Transfer",   color: "#60a5fa" },
-    send_alert:       { label: "Sent Alert",          color: "#ff9800" },
-    suspend_plan:     { label: "Suspended Plan",      color: "#ff5252" },
-  };
-
-  const pendingPayouts = payouts.filter(p => p.status === "Pending");
-  const avgTrust = defaulters.length
-    ? Math.round(defaulters.reduce((a, d) => a + d.trust_score, 0) / defaulters.length)
+  const pendingCount = payHook.items.filter(p => p.status === "Pending").length;
+  const avgTrust     = defHook.items.length
+    ? Math.round(defHook.items.reduce((a, d) => a + d.trust_score, 0) / defHook.items.length)
     : 100;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  if (!authReady) return null;
+
+  const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:#040a06;font-family:'Outfit',sans-serif;color:#f0f0f0}
+    ::-webkit-scrollbar{width:3px;height:3px}
+    ::-webkit-scrollbar-thumb{background:rgba(0,230,118,0.2);border-radius:99px}
+    input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.25)}
+    select option{background:#0d1a10;color:#f0f0f0}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideIn{from{opacity:0;transform:translateX(50px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
+    @keyframes bellShake{0%,100%{transform:rotate(0)}20%{transform:rotate(-15deg)}40%{transform:rotate(15deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(8deg)}}
+    .sec{animation:fadeUp 0.35s ease}
+    .tabbtn:hover{background:rgba(255,255,255,0.04)!important;color:rgba(255,255,255,0.7)!important}
+    .crow:hover td{background:rgba(255,255,255,0.018)}
+    .qbtn:hover{transform:translateY(-2px);background:rgba(255,255,255,0.05)!important}
+    .bell-shake{animation:bellShake 0.5s ease}
+  `;
+
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
+      <style>{css}</style>
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      {/* Reject modal */}
+      {rejectTarget && (
+        <RejectModal
+          payout={rejectTarget}
+          onClose={() => setRejectTarget(null)}
+          onConfirm={confirmReject}
+        />
+      )}
 
-        :root {
-          --bg:        #040a06;
-          --surface:   rgba(255,255,255,0.035);
-          --border:    rgba(255,255,255,0.07);
-          --red:       #ff4040;
-          --green:     #00e676;
-          --blue:      #60a5fa;
-          --gold:      #f5c518;
-          --amber:     #ff9800;
-          --text:      #f0f0f0;
-          --muted:     rgba(255,255,255,0.38);
-          --radius-sm: 10px;
-          --radius-md: 16px;
-          --radius-lg: 22px;
-          --font-ui:   'Outfit', sans-serif;
-          --font-head: 'Syne', sans-serif;
-          --font-mono: 'DM Mono', monospace;
-          --header-h:  60px;
-        }
+      {/* Notification panel */}
+      {showNotif && (
+        <NotifPanel
+          items={notifHook.items}
+          onMarkRead={notifHook.markRead}
+          onClose={() => setShowNotif(false)}
+        />
+      )}
 
-        body { background: var(--bg); color: var(--text); font-family: var(--font-ui); }
+      {/* Toasts */}
+      <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{ background: "rgba(8,18,10,0.96)", border: `1px solid ${t.ok ? "rgba(0,230,118,0.18)" : "rgba(255,64,64,0.25)"}`, borderRadius: 16, padding: "12px 18px", fontSize: 13, animation: "slideIn 0.3s ease", backdropFilter: "blur(16px)", maxWidth: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>{t.msg}</div>
+        ))}
+      </div>
 
-        ::-webkit-scrollbar { width: 3px; height: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,64,64,0.25); border-radius: 99px; }
-
-        input::placeholder { color: var(--muted); }
-        select option { background: #0d1a10; color: var(--text); }
-
-        /* ── Animations ─────────────────────────────────── */
-        @keyframes fadeUp   { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes slideIn  { from { opacity:0; transform:translateX(50px); } to { opacity:1; transform:translateX(0); } }
-        @keyframes pulse    { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-        @keyframes spin     { to { transform: rotate(360deg); } }
-        @keyframes shimmer  { from { background-position: -200% 0; } to { background-position: 200% 0; } }
-
-        /* ── Layout ─────────────────────────────────────── */
-        .admin-layout {
-          min-height: 100vh;
-          background:
-            radial-gradient(ellipse 70% 40% at 50% -10%, rgba(20,80,30,0.35) 0%, transparent 60%),
-            radial-gradient(ellipse 40% 30% at 90% 80%,  rgba(255,64,64,0.06) 0%, transparent 55%),
-            var(--bg);
-        }
-
-        /* ── Header ─────────────────────────────────────── */
-        .header {
-          position: sticky; top: 0; z-index: 200;
-          height: var(--header-h);
-          backdrop-filter: blur(24px) saturate(1.6);
-          background: rgba(4,10,6,0.82);
-          border-bottom: 1px solid rgba(0,230,118,0.08);
-          display: flex; align-items: center;
-          padding: 0 24px;
-        }
-        .header-inner {
-          max-width: 1080px; width: 100%; margin: 0 auto;
-          display: flex; align-items: center; justify-content: space-between; gap: 16px;
-        }
-        .header-brand { display: flex; align-items: center; gap: 10px; }
-        .header-brand-text { line-height: 1.15; }
-        .header-brand-name {
-          font-family: var(--font-head); font-size: 15px; font-weight: 800;
-          background: linear-gradient(135deg, #e8f5e9, #a5d6a7);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .header-brand-sub {
-          font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
-          color: var(--red); font-weight: 700;
-        }
-        .header-right { display: flex; align-items: center; gap: 14px; }
-        .header-status { display: flex; align-items: center; gap: 6px; }
-        .status-dot {
-          width: 7px; height: 7px; border-radius: 99px;
-          background: var(--red); animation: pulse 2s infinite;
-        }
-        .status-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; }
-        .header-admin-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); }
-        .logout-btn {
-          background: rgba(255,64,64,0.08); border: 1px solid rgba(255,64,64,0.22);
-          color: var(--red); border-radius: var(--radius-sm);
-          padding: 6px 14px; font-size: 11px; font-weight: 700;
-          cursor: pointer; font-family: var(--font-ui); transition: all 0.2s;
-        }
-        .logout-btn:hover { background: rgba(255,64,64,0.15); }
-
-        /* ── Content ─────────────────────────────────────── */
-        .content { max-width: 1080px; margin: 0 auto; padding: 24px 16px 80px; }
-
-        /* ── Tab Nav ─────────────────────────────────────── */
-        .tab-nav {
-          display: flex; gap: 3px; overflow-x: auto;
-          background: rgba(255,255,255,0.025);
-          border: 1px solid var(--border); border-radius: var(--radius-md);
-          padding: 4px; margin-bottom: 28px;
-        }
-        .tab-nav::-webkit-scrollbar { height: 0; }
-        .tab-btn {
-          flex: 1; min-width: max-content;
-          background: transparent; border: 1px solid transparent;
-          color: var(--muted); border-radius: 12px;
-          padding: 9px 16px; font-size: 12px; font-weight: 700;
-          cursor: pointer; font-family: var(--font-ui); transition: all 0.2s;
-          white-space: nowrap;
-        }
-        .tab-btn:hover { color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.04); }
-        .tab-btn.active {
-          background: rgba(0,230,118,0.1); color: var(--green);
-          border-color: rgba(0,230,118,0.22);
-        }
-
-        /* ── Section animation ───────────────────────────── */
-        .section { animation: fadeUp 0.35s ease; }
-
-        /* ── Card ────────────────────────────────────────── */
-        .gg-card {
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-lg);
-          backdrop-filter: blur(20px);
-          padding: 22px;
-          box-shadow: 0 8px 40px rgba(0,0,0,0.35);
-        }
-
-        /* ── Stat Card ───────────────────────────────────── */
-        .stat-card {
-          flex: 1; min-width: 130px;
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-lg);
-          padding: 20px 18px 18px;
-          position: relative; overflow: hidden;
-          display: flex; gap: 14px; align-items: flex-start;
-          box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-          transition: border-color 0.2s, transform 0.2s;
-        }
-        .stat-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-        .stat-glow {
-          position: absolute; bottom: -20px; right: -20px;
-          width: 80px; height: 80px; border-radius: 99px;
-          background: var(--accent, #fff);
-          opacity: 0.06; filter: blur(24px); pointer-events: none;
-        }
-        .stat-icon { font-size: 22px; line-height: 1; margin-top: 2px; }
-        .stat-label {
-          font-size: 9px; text-transform: uppercase; letter-spacing: 1.4px;
-          color: var(--muted); margin-bottom: 6px; font-weight: 600;
-        }
-        .stat-value { font-size: 22px; font-weight: 800; color: #fff; line-height: 1; font-family: var(--font-head); }
-        .stat-sub { font-size: 11px; color: var(--accent, var(--muted)); margin-top: 4px; font-weight: 600; }
-
-        /* ── Badge ───────────────────────────────────────── */
-        .badge {
-          display: inline-block; border-radius: 99px;
-          padding: 3px 10px; font-size: 10px; font-weight: 700;
-          white-space: nowrap; border: 1px solid;
-        }
-        .badge-success { background: rgba(0,230,118,0.1);  color: #00e676; border-color: rgba(0,230,118,0.25); }
-        .badge-danger  { background: rgba(255,64,64,0.1);  color: #ff5252; border-color: rgba(255,64,64,0.25); }
-        .badge-warning { background: rgba(255,152,0,0.1);  color: #ff9800; border-color: rgba(255,152,0,0.25); }
-        .badge-info    { background: rgba(96,165,250,0.1); color: #60a5fa; border-color: rgba(96,165,250,0.25); }
-        .badge-neutral { background: rgba(255,255,255,0.06); color: var(--muted); border-color: var(--border); }
-
-        /* ── Avatar ──────────────────────────────────────── */
-        .avatar {
-          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-          background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05));
-          border: 1px solid rgba(0,230,118,0.2);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 13px; font-weight: 800; color: var(--green);
-          font-family: var(--font-head);
-        }
-
-        /* ── Buttons ─────────────────────────────────────── */
-        .btn {
-          display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-          border-radius: var(--radius-sm); font-weight: 700; cursor: pointer;
-          font-family: var(--font-ui); transition: all 0.18s; white-space: nowrap;
-          border: 1px solid;
-        }
-        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .btn-sm  { padding: 6px 12px; font-size: 11px; }
-        .btn-md  { padding: 8px 16px; font-size: 12px; }
-
-        .btn-success { background: rgba(0,230,118,0.1);  color: #00e676; border-color: rgba(0,230,118,0.25); }
-        .btn-success:hover:not(:disabled) { background: rgba(0,230,118,0.18); }
-        .btn-danger  { background: rgba(255,64,64,0.1);  color: #ff5252; border-color: rgba(255,64,64,0.25); }
-        .btn-danger:hover:not(:disabled)  { background: rgba(255,64,64,0.18); }
-        .btn-info    { background: rgba(96,165,250,0.1); color: #60a5fa; border-color: rgba(96,165,250,0.25); }
-        .btn-info:hover:not(:disabled)    { background: rgba(96,165,250,0.18); }
-        .btn-warning { background: rgba(255,152,0,0.1);  color: #ff9800; border-color: rgba(255,152,0,0.25); }
-        .btn-warning:hover:not(:disabled) { background: rgba(255,152,0,0.18); }
-        .btn-ghost   { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); border-color: var(--border); }
-        .btn-ghost:hover:not(:disabled)   { background: rgba(255,255,255,0.09); }
-
-        /* ── Spinner ─────────────────────────────────────── */
-        .spinner {
-          width: 12px; height: 12px; border-radius: 99px;
-          border: 2px solid currentColor; border-top-color: transparent;
-          animation: spin 0.7s linear infinite; display: inline-block;
-        }
-
-        /* ── Trust bar ───────────────────────────────────── */
-        .trust-bar-wrap {
-          height: 3px; border-radius: 99px; background: rgba(255,255,255,0.07);
-          overflow: hidden; margin-top: 6px;
-        }
-        .trust-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
-
-        /* ── Divider rows ────────────────────────────────── */
-        .row-divider { border-bottom: 1px solid rgba(255,255,255,0.04); }
-
-        /* ── Input ───────────────────────────────────────── */
-        .gg-input {
-          background: rgba(255,255,255,0.05); border: 1px solid var(--border);
-          border-radius: var(--radius-sm); padding: 10px 14px;
-          color: var(--text); font-size: 13px; outline: none;
-          font-family: var(--font-ui); transition: border-color 0.2s;
-        }
-        .gg-input:focus { border-color: rgba(0,230,118,0.3); }
-
-        /* ── Table ───────────────────────────────────────── */
-        .gg-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .gg-table th {
-          text-align: left; padding: 12px 16px;
-          font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px;
-          color: var(--muted); font-weight: 600;
-          border-bottom: 1px solid rgba(255,255,255,0.06); white-space: nowrap;
-        }
-        .gg-table td {
-          padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
-          vertical-align: middle;
-        }
-        .gg-table tr:last-child td { border-bottom: none; }
-        .gg-table tr:hover td { background: rgba(255,255,255,0.018); }
-
-        /* ── Toast ───────────────────────────────────────── */
-        .toast-wrap {
-          position: fixed; top: 20px; right: 20px; z-index: 9999;
-          display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-        }
-        .toast {
-          background: rgba(8,18,10,0.96); border: 1px solid rgba(0,230,118,0.15);
-          border-radius: var(--radius-md); padding: 12px 18px;
-          font-size: 13px; animation: slideIn 0.3s ease;
-          backdrop-filter: blur(16px); max-width: 280px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-        }
-
-        /* ── Quick action cards ──────────────────────────── */
-        .quick-action {
-          flex: 1; min-width: 140px;
-          background: rgba(255,255,255,0.025); border: 1px solid var(--border);
-          border-radius: var(--radius-md); padding: 16px; cursor: pointer;
-          font-family: var(--font-ui); transition: all 0.2s; text-align: left;
-        }
-        .quick-action:hover { transform: translateY(-2px); border-color: var(--qa-color, var(--border)); background: rgba(255,255,255,0.045); }
-        .quick-action-icon { font-size: 22px; margin-bottom: 8px; }
-        .quick-action-label { font-size: 12px; font-weight: 700; }
-
-        /* ── Section header ──────────────────────────────── */
-        .section-title { font-family: var(--font-head); font-size: 19px; font-weight: 800; }
-        .section-desc  { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
-
-        /* ── Filter pills ────────────────────────────────── */
-        .filter-pill {
-          background: rgba(255,255,255,0.04); border: 1px solid var(--border);
-          color: var(--muted); border-radius: 8px; padding: 6px 12px;
-          font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--font-ui);
-          transition: all 0.18s;
-        }
-        .filter-pill.active {
-          background: rgba(255,64,64,0.12); color: var(--red);
-          border-color: rgba(255,64,64,0.28);
-        }
-
-        /* ── Payout card ─────────────────────────────────── */
-        .payout-row { padding: 18px 0; }
-        .payout-row:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .payout-meta { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--font-mono); }
-
-        /* ── Audit log ───────────────────────────────────── */
-        .audit-dot {
-          width: 8px; height: 8px; border-radius: 99px; flex-shrink: 0;
-          margin-top: 4px;
-        }
-        .audit-action { font-size: 13px; font-weight: 700; }
-        .audit-target { font-size: 12px; color: var(--muted); margin-top: 2px; }
-        .audit-time   { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 2px; font-family: var(--font-mono); }
-
-        /* ── Empty state ─────────────────────────────────── */
-        .empty-state { text-align: center; padding: 40px 0; }
-        .empty-state-emoji { font-size: 36px; margin-bottom: 10px; }
-        .empty-state-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-        .empty-state-desc  { font-size: 12px; color: var(--muted); }
-
-        /* ── Responsive ──────────────────────────────────── */
-        @media (max-width: 600px) {
-          .stat-value { font-size: 18px; }
-          .header { padding: 0 14px; }
-          .content { padding: 16px 12px 80px; }
-          .gg-card { padding: 16px; border-radius: var(--radius-md); }
-        }
-      `}</style>
-
-      <div className="admin-layout">
-
-        {/* ── Toasts ── */}
-        <div className="toast-wrap">
-          {toasts.map(t => (
-            <div key={t.id} className="toast">{t.msg}</div>
-          ))}
-        </div>
+      <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse 70% 40% at 50% -10%,rgba(20,80,30,0.35) 0%,transparent 60%),#040a06" }}>
 
         {/* ── Header ── */}
-        <header className="header">
-          <div className="header-inner">
-            <div className="header-brand">
-              <GGLogo size={38}/>
-              <div className="header-brand-text">
-                <div className="header-brand-name">God's Grace</div>
-                <div className="header-brand-sub">Admin Control Panel</div>
+        <header style={{ position: "sticky", top: 0, zIndex: 200, height: 60, backdropFilter: "blur(24px) saturate(1.6)", background: "rgba(4,10,6,0.85)", borderBottom: "1px solid rgba(0,230,118,0.08)", display: "flex", alignItems: "center", padding: "0 20px" }}>
+          <div style={{ maxWidth: 1080, width: "100%", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <GGLogo/>
+              <div>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 15, fontWeight: 800, background: "linear-gradient(135deg,#e8f5e9,#a5d6a7)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>God&apos;s Grace</div>
+                <div style={{ fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: G.red, fontWeight: 700 }}>Admin Panel</div>
               </div>
             </div>
-            <div className="header-right">
-              <div className="header-status">
-                <div className="status-dot"/>
-                <span className="status-label">Live</span>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {/* Pending payout badge */}
+              {pendingCount > 0 && (
+                <div style={{ background: "rgba(255,152,0,0.1)", border: "1px solid rgba(255,152,0,0.25)", borderRadius: 99, padding: "4px 12px", fontSize: 11, color: G.amber, fontWeight: 700, cursor: "pointer" }} onClick={() => { setTab("Payouts"); setFilter("Pending"); }}>
+                  ⏳ {pendingCount} pending
+                </div>
+              )}
+
+              {/* Bell */}
+              <button
+                onClick={() => setShowNotif(v => !v)}
+                className={notifHook.unread > 0 ? "bell-shake" : ""}
+                style={{ position: "relative", background: "rgba(255,255,255,0.05)", border: `1px solid ${G.border}`, borderRadius: 11, width: 38, height: 38, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}
+              >
+                🔔
+                {notifHook.unread > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -4, background: G.red, color: "#fff", borderRadius: 99, fontSize: 9, fontWeight: 900, padding: "2px 5px", minWidth: 16, textAlign: "center" }}>
+                    {notifHook.unread > 9 ? "9+" : notifHook.unread}
+                  </span>
+                )}
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 7, height: 7, borderRadius: 99, background: G.green, animation: "pulse 2s infinite" }}/>
+                <span style={{ fontSize: 10, color: G.muted }}>Live</span>
               </div>
-              <span className="header-admin-name">{adminName.split(" ")[0]}</span>
-              <button className="logout-btn" onClick={handleLogout}>Logout</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{adminName.split(" ")[0]}</span>
+              <button onClick={logout} style={{ background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.22)", color: G.red, borderRadius: 9, padding: "6px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Logout</button>
             </div>
           </div>
         </header>
 
-        {/* ── Main ── */}
-        <main className="content">
+        {/* ── Content ── */}
+        <main style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 16px 80px" }}>
 
           {/* Tab nav */}
-          <nav className="tab-nav">
+          <nav style={{ display: "flex", gap: 3, overflowX: "auto", background: "rgba(255,255,255,0.025)", border: `1px solid ${G.border}`, borderRadius: 18, padding: 4, marginBottom: 28 }}>
             {TABS.map(t => (
-              <button key={t} className={`tab-btn${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-                {t}
+              <button key={t} className="tabbtn" onClick={() => setTab(t)} style={{ flex: 1, minWidth: "max-content", background: tab === t ? "rgba(0,230,118,0.1)" : "transparent", color: tab === t ? G.green : G.muted, border: tab === t ? "1px solid rgba(0,230,118,0.22)" : "1px solid transparent", borderRadius: 13, padding: "9px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", whiteSpace: "nowrap" }}>
+                {t}{t === "Payouts" && pendingCount > 0 ? ` (${pendingCount})` : ""}
               </button>
             ))}
           </nav>
 
-          {/* ══════════════════ OVERVIEW ══════════════════ */}
+          {/* ═══════════════════ OVERVIEW ═══════════════════ */}
           {tab === "Overview" && (
-            <div className="section" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sec" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
               <div>
-                <div className="section-title">Good day, {adminName.split(" ")[0]} 👑</div>
-                <div className="section-desc">
-                  {new Date().toLocaleDateString("en-NG", { weekday: "long", month: "long", day: "numeric" })}
-                  &nbsp;· Platform at a glance
+                <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 900 }}>Good day, {adminName.split(" ")[0]} 👑</div>
+                <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>
+                  {new Date().toLocaleDateString("en-NG", { weekday: "long", month: "long", day: "numeric" })} · Platform at a glance
                 </div>
               </div>
 
-              {/* Stats */}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <StatCard label="Total Float"    value={fmt(MOCK_ADMIN_STATS.total_float)}             sub="In escrow"          icon="🏦" accent="#60a5fa"/>
-                <StatCard label="Members"        value={MOCK_ADMIN_STATS.total_users}                  sub="Registered"         icon="👥" accent="#00e676"/>
-                <StatCard label="Active Plans"   value={MOCK_ADMIN_STATS.active_plans}                 sub="Contributing"       icon="📈" accent="#00e676"/>
-                <StatCard label="Defaulters"     value={MOCK_ADMIN_STATS.defaulter_count}              sub="3+ days missed"     icon="⚠️" accent="#ff5252"/>
-                <StatCard label="Payouts Today"  value={fmt(MOCK_ADMIN_STATS.payouts_today_amount)}    sub={`${MOCK_ADMIN_STATS.payouts_today} transfers`} icon="📤" accent="#ff9800"/>
+                <StatCard label="Total Float"   value={statsHook.stats ? fmt(statsHook.stats.total_float) : "—"}           sub="All confirmed contributions"              icon="🏦" accent={G.blue}  loading={statsHook.loading}/>
+                <StatCard label="Members"       value={statsHook.stats?.total_users ?? "—"}                                sub="Registered"                              icon="👥" accent={G.green} loading={statsHook.loading}/>
+                <StatCard label="Active Plans"  value={statsHook.stats?.active_plans ?? "—"}                               sub="Currently contributing"                  icon="📈" accent={G.green} loading={statsHook.loading}/>
+                <StatCard label="Defaulters"    value={statsHook.stats?.defaulter_count ?? "—"}                            sub="Trust score < 70"                        icon="⚠️" accent={G.red}   loading={statsHook.loading}/>
+                <StatCard label="Payouts Today" value={statsHook.stats ? fmt(statsHook.stats.payouts_today_amount) : "—"} sub={`${statsHook.stats?.payouts_today ?? 0} transfers`} icon="📤" accent={G.amber} loading={statsHook.loading}/>
               </div>
 
               {/* Quick actions */}
               <Card>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", marginBottom: 14, textTransform: "uppercase", letterSpacing: 1 }}>Quick Actions</div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.5, color: G.muted, marginBottom: 14, fontWeight: 700 }}>Quick Actions</div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   {[
-                    { label: "Pending Payouts", t: "Payouts",    icon: "💸", color: "#60a5fa" },
-                    { label: "Defaulters",      t: "Defaulters", icon: "⚠️", color: "#ff5252" },
-                    { label: "All Members",     t: "All Members",icon: "👥", color: "#00e676" },
-                    { label: "Audit Log",       t: "Audit Log",  icon: "📋", color: "#ff9800" },
-                  ].map(({ label, t, icon, color }) => (
-                    <button
-                      key={t} className="quick-action"
-                      style={{ "--qa-color": color } as React.CSSProperties}
-                      onClick={() => setTab(t)}
-                    >
-                      <div className="quick-action-icon">{icon}</div>
-                      <div className="quick-action-label" style={{ color }}>{label}</div>
+                    { label: "Pending Payouts", count: pendingCount, t: "Payouts",   filter: "Pending", icon: "💸", color: G.blue  },
+                    { label: "Defaulters",      count: defHook.items.length, t: "Defaulters",icon: "⚠️", color: G.red   },
+                    { label: "All Members",     count: membHook.items.length, t: "Members",  icon: "👥", color: G.green },
+                    { label: "Audit Log",       count: null, t: "Audit Log",  icon: "📋", color: G.amber },
+                  ].map(({ label, count, t, icon, color, filter: f }) => (
+                    <button key={t} className="qbtn" onClick={() => { setTab(t); if (f) setFilter(f); }} style={{ flex: 1, minWidth: 140, background: "rgba(255,255,255,0.025)", border: `1px solid ${G.border}`, borderRadius: 16, padding: 16, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", textAlign: "left" }}>
+                      <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color }}>{label}</div>
+                      {count !== null && <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>{count} {count === 1 ? "record" : "records"}</div>}
                     </button>
                   ))}
                 </div>
@@ -653,224 +481,244 @@ export default function AdminDashboard() {
               <Card>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>Pending Payouts</div>
-                  <button onClick={() => setTab("Payouts")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--red)", fontFamily: "var(--font-ui)", fontWeight: 700 }}>
-                    View all →
-                  </button>
+                  <button onClick={() => { setTab("Payouts"); setFilter("Pending"); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: G.red, fontFamily: "inherit", fontWeight: 700 }}>View all →</button>
                 </div>
-                {pendingPayouts.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="empty-state-emoji">🎉</div>
-                    <div className="empty-state-desc">No pending payouts</div>
-                  </div>
-                ) : pendingPayouts.slice(0, 3).map(p => (
-                  <div key={p.id} className="row-divider" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", flexWrap: "wrap" }}>
-                    <Avatar name={p.user.full_name}/>
-                    <div style={{ flex: 1, minWidth: 100 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{p.user.full_name}</div>
-                      <div className="payout-meta">{p.dest_bank} · {p.dest_account}</div>
-                    </div>
-                    <div style={{ fontWeight: 800, color: "#fff", fontSize: 15, fontFamily: "var(--font-head)" }}>{fmt(p.amount)}</div>
-                    <Badge status={p.status}/>
-                  </div>
-                ))}
-              </Card>
-            </div>
-          )}
-
-          {/* ══════════════════ PAYOUTS ══════════════════ */}
-          {tab === "Payouts" && (
-            <div className="section" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                <div className="section-title">Payout Queue</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {["All", "Pending", "Approved", "Completed", "Rejected"].map(s => (
-                    <button key={s} className={`filter-pill${filterStatus === s ? " active" : ""}`} onClick={() => setFilterStatus(s)}>{s}</button>
-                  ))}
-                </div>
-              </div>
-
-              <Card style={{ padding: 0 }}>
-                <div style={{ padding: "0 22px" }}>
-                  {filteredPayouts.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-emoji">📭</div>
-                      <div className="empty-state-desc">No payouts with this status</div>
-                    </div>
-                  ) : filteredPayouts.map(p => (
-                    <div key={p.id} className="payout-row">
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-                        <Avatar name={p.user.full_name}/>
-                        <div style={{ flex: 1, minWidth: 120 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700 }}>{p.user.full_name}</div>
-                          <div className="payout-meta">{p.user.email} · {p.user.phone}</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: "var(--font-head)" }}>{fmt(p.amount)}</div>
-                          <div className="payout-meta" style={{ textAlign: "right" }}>
-                            {new Date(p.requested_at).toLocaleDateString("en-NG", { day: "2-digit", month: "short" })}
+                {payHook.loading
+                  ? [1,2,3].map(i => <div key={i} style={{ padding: "12px 0", borderBottom: `1px solid ${G.border}` }}><Sk h={36}/></div>)
+                  : payHook.items.filter(p => p.status === "Pending").length === 0
+                    ? <Empty emoji="🎉" desc="No pending payouts — you&apos;re all caught up!"/>
+                    : payHook.items.filter(p => p.status === "Pending").slice(0, 4).map(p => (
+                        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: `1px solid ${G.border}`, flexWrap: "wrap" }}>
+                          <Av name={p.user?.full_name ?? "?"}/>
+                          <div style={{ flex: 1, minWidth: 100 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{p.user?.full_name}</div>
+                            <div style={{ fontSize: 11, color: G.muted, fontFamily: "'DM Mono',monospace" }}>{p.dest_bank} · {p.dest_account}</div>
+                          </div>
+                          <div style={{ fontWeight: 900, fontSize: 15, fontFamily: "'Syne',sans-serif" }}>{fmt(p.amount)}</div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <Btn label="✓" variant="success" sm onClick={() => approve(p)} loading={busy[p.id]}/>
+                            <Btn label="✗" variant="danger"  sm onClick={() => setRejectTarget(p)}/>
                           </div>
                         </div>
-                        <Badge status={p.status}/>
-                      </div>
-                      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                        <div className="payout-meta">
-                          🏦 {p.dest_bank} · <span style={{ fontFamily: "var(--font-mono)" }}>{p.dest_account}</span>
-                          &nbsp;· OTP: {p.otp_verified ? "✓ Verified" : "✗ Unverified"}
+                      ))
+                }
+              </Card>
+
+              {/* Recent notifications */}
+              <Card>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>Recent Activity</div>
+                  {notifHook.unread > 0 && <Badge s={`${notifHook.unread} unread`}/>}
+                </div>
+                {notifHook.loading
+                  ? [1,2,3].map(i => <div key={i} style={{ padding: "10px 0", borderBottom: `1px solid ${G.border}` }}><Sk h={28}/></div>)
+                  : notifHook.items.length === 0
+                    ? <Empty emoji="🔔" desc="No activity yet"/>
+                    : notifHook.items.slice(0, 5).map(n => (
+                        <div key={n.id} style={{ display: "flex", gap: 12, padding: "11px 0", borderBottom: `1px solid ${G.border}`, alignItems: "flex-start", opacity: n.is_read ? 0.5 : 1 }}>
+                          <div style={{ fontSize: 18, flexShrink: 0 }}>{NOTIF_ICON[n.type] ?? "🔔"}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: n.is_read ? 500 : 700 }}>{n.title}</div>
+                            {n.body && <div style={{ fontSize: 12, color: G.muted, marginTop: 1 }}>{n.body}</div>}
+                          </div>
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>{ago(n.created_at)}</div>
                         </div>
-                        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                          {p.status === "Pending" && (
-                            <>
-                              <Btn label="✓ Approve"  variant="success" size="sm" onClick={() => approvePayout(p.id)}      loading={loading[p.id]}/>
-                              <Btn label="✗ Reject"   variant="danger"  size="sm" onClick={() => rejectPayout(p.id)}       loading={loading[`rej_${p.id}`]}/>
-                            </>
-                          )}
-                          {p.status === "Approved" && (
-                            <Btn label="💸 Execute Transfer" variant="info" size="sm" onClick={() => executePayout(p.id)} loading={loading[`exec_${p.id}`]}/>
-                          )}
-                          {p.status === "Completed" && <span style={{ fontSize: 12, color: "var(--muted)" }}>Settled ✓</span>}
-                          {p.status === "Rejected"  && <span style={{ fontSize: 12, color: "rgba(255,82,82,0.5)" }}>Rejected ✗</span>}
-                        </div>
-                      </div>
-                    </div>
+                      ))
+                }
+              </Card>
+            </div>
+          )}
+
+          {/* ═══════════════════ PAYOUTS ═══════════════════ */}
+          {tab === "Payouts" && (
+            <div className="sec" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 19, fontWeight: 900 }}>Payout Queue</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["All","Pending","Approved","Completed","Rejected"].map(s => (
+                    <button key={s} onClick={() => setFilter(s)} style={{ background: filter === s ? "rgba(255,64,64,0.12)" : "rgba(255,255,255,0.04)", color: filter === s ? G.red : G.muted, border: filter === s ? "1px solid rgba(255,64,64,0.28)" : `1px solid ${G.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }}>{s}</button>
                   ))}
                 </div>
+              </div>
+
+              <Card style={{ padding: "0 22px" }}>
+                {payHook.loading
+                  ? [1,2,3].map(i => <div key={i} style={{ padding: "20px 0", borderBottom: `1px solid ${G.border}` }}><Sk h={56}/></div>)
+                  : filteredPay.length === 0
+                    ? <Empty emoji="📭" desc="No payouts with this status"/>
+                    : filteredPay.map(p => (
+                        <div key={p.id} style={{ padding: "18px 0", borderBottom: `1px solid ${G.border}` }}>
+                          {/* Row header */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+                            <Av name={p.user?.full_name ?? "?"}/>
+                            <div style={{ flex: 1, minWidth: 120 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700 }}>{p.user?.full_name}</div>
+                              <div style={{ fontSize: 11, color: G.muted }}>{p.user?.email} · {p.user?.phone}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 18, fontWeight: 900, fontFamily: "'Syne',sans-serif" }}>{fmt(p.amount)}</div>
+                              <div style={{ fontSize: 11, color: G.muted, fontFamily: "'DM Mono',monospace" }}>{ago(p.requested_at)}</div>
+                            </div>
+                            <Badge s={p.status}/>
+                          </div>
+                          {/* Bank info */}
+                          <div style={{ fontSize: 11, color: G.muted, fontFamily: "'DM Mono',monospace", marginBottom: 10 }}>
+                            🏦 {p.dest_bank} · {p.dest_account}{p.dest_name ? ` · ${p.dest_name}` : ""} · OTP: {p.otp_verified ? "✓ Verified" : "✗ Unverified"}
+                          </div>
+                          {/* Admin note */}
+                          {p.admin_note && (
+                            <div style={{ fontSize: 12, color: G.amber, background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.15)", borderRadius: 9, padding: "8px 12px", marginBottom: 10 }}>
+                              Note: {p.admin_note}
+                            </div>
+                          )}
+                          {/* Actions */}
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            {p.status === "Pending" && (
+                              <>
+                                {!p.otp_verified && <span style={{ fontSize: 11, color: G.red, alignSelf: "center" }}>⚠️ OTP not verified</span>}
+                                <Btn label="✓ Approve" variant="success" sm onClick={() => approve(p)} loading={busy[p.id]}/>
+                                <Btn label="✗ Reject"  variant="danger"  sm onClick={() => setRejectTarget(p)}/>
+                              </>
+                            )}
+                            {p.status === "Approved" && (
+                              <Btn label="💸 Execute Transfer" variant="info" sm onClick={() => execute(p)} loading={busy[`ex_${p.id}`]}/>
+                            )}
+                            {p.status === "Completed" && <span style={{ fontSize: 11, color: G.muted }}>Settled ✓ {p.resolved_at ? ago(p.resolved_at) : ""}</span>}
+                            {p.status === "Rejected"  && <span style={{ fontSize: 11, color: "rgba(255,82,82,0.4)" }}>Rejected ✗</span>}
+                          </div>
+                        </div>
+                      ))
+                }
               </Card>
             </div>
           )}
 
-          {/* ══════════════════ DEFAULTERS ══════════════════ */}
+          {/* ═══════════════════ DEFAULTERS ═══════════════════ */}
           {tab === "Defaulters" && (
-            <div className="section" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <div className="section-title">Defaulter Management</div>
+            <div className="sec" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 19, fontWeight: 900 }}>Defaulter Management</div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <StatCard label="Total Defaulters" value={defaulters.length}  sub="3+ days missed"   icon="⚠️" accent="#ff5252"/>
-                <StatCard label="Avg Trust Score"  value={`${avgTrust}/100`}  sub="Among defaulters" icon="📉" accent="#ff9800"/>
+                <StatCard label="Defaulters"      value={defHook.loading ? "…" : defHook.items.length} sub="Trust score below 70" icon="⚠️" accent={G.red}   loading={defHook.loading}/>
+                <StatCard label="Avg Trust Score" value={defHook.loading ? "…" : `${avgTrust}/100`}    sub="Among defaulters"    icon="📉" accent={G.amber} loading={defHook.loading}/>
               </div>
               <Card>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>Active Defaulters</div>
-                  <Badge status={`${defaulters.length} member${defaulters.length !== 1 ? "s" : ""}`}/>
-                </div>
-                {defaulters.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="empty-state-emoji">🎉</div>
-                    <div className="empty-state-title">No defaulters!</div>
-                    <div className="empty-state-desc">All members are contributing on time.</div>
-                  </div>
-                ) : defaulters.map(d => (
-                  <div key={d.id} className="row-divider" style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 0", flexWrap: "wrap" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                      {d.days_missed >= 5 ? "🔴" : d.days_missed >= 4 ? "🟠" : "🟡"}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 120 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700 }}>{d.full_name}</div>
-                      <div className="payout-meta">{d.days_missed} days missed · Trust: {d.trust_score}/100 · {d.phone}</div>
-                      <TrustBar score={d.trust_score}/>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <Btn label="📲 Alert"   variant="warning" size="sm" onClick={() => sendAlert(d.id, d.full_name)} loading={loading[`alert_${d.id}`]}/>
-                      <Btn label="⛔ Suspend" variant="danger"  size="sm" onClick={() => suspendUser(d.id)}            loading={loading[`sus_${d.id}`]}/>
-                    </div>
-                  </div>
-                ))}
+                {defHook.loading
+                  ? [1,2,3].map(i => <div key={i} style={{ padding: "14px 0", borderBottom: `1px solid ${G.border}` }}><Sk h={40}/></div>)
+                  : defHook.items.length === 0
+                    ? <Empty emoji="🎉" title="No defaulters!" desc="All members are contributing on time."/>
+                    : defHook.items.map(d => (
+                        <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 0", borderBottom: `1px solid ${G.border}`, flexWrap: "wrap" }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                            {d.trust_score < 40 ? "🔴" : d.trust_score < 55 ? "🟠" : "🟡"}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 140 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700 }}>{d.full_name}</div>
+                            <div style={{ fontSize: 11, color: G.muted, fontFamily: "'DM Mono',monospace" }}>
+                              Trust: {d.trust_score}/100 · Streak: {d.contribution_streak}d · {d.phone}
+                            </div>
+                            <TBar score={d.trust_score}/>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <Btn label="⛔ Suspend" variant="danger" sm onClick={() => suspend(d as any)} loading={busy[`su_${d.id}`]}/>
+                          </div>
+                        </div>
+                      ))
+                }
               </Card>
             </div>
           )}
 
-          {/* ══════════════════ ALL MEMBERS ══════════════════ */}
-          {tab === "All Members" && (
-            <div className="section" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* ═══════════════════ MEMBERS ═══════════════════ */}
+          {tab === "Members" && (
+            <div className="sec" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                 <div>
-                  <div className="section-title">All Members</div>
-                  <div className="section-desc">{users.length} registered</div>
+                  <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 19, fontWeight: 900 }}>All Members</div>
+                  <div style={{ fontSize: 12, color: G.muted, marginTop: 3 }}>{membHook.items.length} registered</div>
                 </div>
-                <input
-                  className="gg-input"
-                  style={{ width: 240 }}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search name or email…"
-                />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or email…" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${G.border}`, borderRadius: 10, padding: "10px 14px", color: "#f0f0f0", fontSize: 13, outline: "none", fontFamily: "inherit", width: 240 }}/>
               </div>
-
               <Card style={{ padding: 0 }}>
                 <div style={{ overflowX: "auto" }}>
-                  <table className="gg-table">
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {["Member", "Plan", "Saved", "Streak", "Trust", "Status", ""].map(h => (
-                          <th key={h}>{h}</th>
+                        {["Member","Plan","Balance","Streak","Trust","Status",""].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "13px 18px", fontSize: 9, textTransform: "uppercase", letterSpacing: 1.2, color: G.muted, fontWeight: 600, borderBottom: `1px solid ${G.border}`, whiteSpace: "nowrap" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.map(u => (
-                        <tr key={u.id}>
-                          <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <Avatar name={u.full_name}/>
-                              <div>
-                                <div style={{ fontWeight: 700, fontSize: 13 }}>{u.full_name}</div>
-                                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{u.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <div style={{ fontSize: 13 }}>{u.plan_type}</div>
-                            <div style={{ fontSize: 11, color: "var(--blue)", marginTop: 1 }}>{fmt(u.fixed_amount)}/day</div>
-                          </td>
-                          <td style={{ fontWeight: 700, color: "var(--green)", fontFamily: "var(--font-head)" }}>{fmt(u.total_saved)}</td>
-                          <td style={{ color: "var(--amber)", fontWeight: 700 }}>🔥 {u.contribution_streak}d</td>
-                          <td>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: u.trust_score >= 80 ? "var(--green)" : u.trust_score >= 50 ? "var(--amber)" : "var(--red)" }}>
-                              {u.trust_score}/100
-                            </div>
-                            <TrustBar score={u.trust_score}/>
-                          </td>
-                          <td><Badge status={u.status}/></td>
-                          <td>
-                            {u.status === "Active"    && <Btn label="Suspend" variant="danger"  size="sm" onClick={() => suspendUser(u.id)} loading={loading[`sus_${u.id}`]}/>}
-                            {u.status === "Suspended" && <Btn label="Restore" variant="success" size="sm" onClick={() => restoreUser(u.id)} loading={loading[`res_${u.id}`]}/>}
-                          </td>
-                        </tr>
-                      ))}
+                      {membHook.loading
+                        ? [1,2,3,4].map(i => <tr key={i} className="crow"><td colSpan={7} style={{ padding: "16px 18px", borderBottom: `1px solid ${G.border}` }}><Sk h={28}/></td></tr>)
+                        : filteredMemb.map(u => (
+                            <tr key={u.id} className="crow">
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}` }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <Av name={u.full_name}/>
+                                  <div>
+                                    <div style={{ fontWeight: 700 }}>{u.full_name}</div>
+                                    <div style={{ fontSize: 11, color: G.muted, marginTop: 1 }}>{u.email}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}` }}>
+                                <div>{u.plan_type}</div>
+                                <div style={{ fontSize: 11, color: G.blue, marginTop: 1 }}>{fmt(u.fixed_amount)}/day</div>
+                              </td>
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}`, fontWeight: 800, color: G.green, fontFamily: "'Syne',sans-serif" }}>{fmt(u.total_saved)}</td>
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}`, color: G.amber, fontWeight: 700 }}>🔥 {u.contribution_streak}d</td>
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}` }}>
+                                <div style={{ fontWeight: 700, color: u.trust_score >= 80 ? G.green : u.trust_score >= 50 ? G.amber : G.red }}>{u.trust_score}/100</div>
+                                <TBar score={u.trust_score}/>
+                              </td>
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}` }}><Badge s={u.status}/></td>
+                              <td style={{ padding: "13px 18px", borderBottom: `1px solid ${G.border}` }}>
+                                {u.status === "Active"    && <Btn label="Suspend" variant="danger"  sm onClick={() => suspend(u)} loading={busy[`su_${u.id}`]}/>}
+                                {u.status === "Suspended" && <Btn label="Restore" variant="success" sm onClick={() => restore(u)} loading={busy[`rs_${u.id}`]}/>}
+                              </td>
+                            </tr>
+                          ))
+                      }
                     </tbody>
                   </table>
-                  {filteredUsers.length === 0 && (
-                    <div className="empty-state"><div className="empty-state-desc">No members match your search.</div></div>
+                  {!membHook.loading && filteredMemb.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "40px", color: G.muted, fontSize: 13 }}>No members match your search.</div>
                   )}
                 </div>
               </Card>
             </div>
           )}
 
-          {/* ══════════════════ AUDIT LOG ══════════════════ */}
+          {/* ═══════════════════ AUDIT LOG ═══════════════════ */}
           {tab === "Audit Log" && (
-            <div className="section">
-              <div className="section-title" style={{ marginBottom: 4 }}>Audit Log</div>
-              <div className="section-desc" style={{ marginBottom: 20 }}>All admin actions are recorded here for transparency.</div>
+            <div className="sec">
+              <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 19, fontWeight: 900, marginBottom: 4 }}>Audit Log</div>
+              <div style={{ fontSize: 12, color: G.muted, marginBottom: 20 }}>Every admin action is written to the database for full accountability.</div>
               <Card>
-                {auditLog.map((a, i) => {
-                  const meta = auditMeta[a.action] ?? { label: a.action, color: "#fff" };
-                  return (
-                    <div key={i} style={{ display: "flex", gap: 14, padding: "14px 0", borderBottom: i < auditLog.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems: "flex-start" }}>
-                      <div className="audit-dot" style={{ background: meta.color, boxShadow: `0 0 8px ${meta.color}88` }}/>
-                      <div style={{ flex: 1 }}>
-                        <div className="audit-action" style={{ color: meta.color }}>{meta.label}</div>
-                        <div className="audit-target">— {a.target}</div>
-                        <div className="audit-time">by {a.admin} · {a.time}</div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {auditHook.loading
+                  ? [1,2,3,4,5].map(i => <div key={i} style={{ padding: "14px 0", borderBottom: `1px solid ${G.border}` }}><Sk h={32}/></div>)
+                  : auditHook.items.length === 0
+                    ? <Empty emoji="📋" desc="No audit entries yet."/>
+                    : auditHook.items.map((a, i) => {
+                        const meta = AUDIT_META[a.action] ?? { label: a.action, color: "#fff", icon: "🔧" };
+                        return (
+                          <div key={a.id} style={{ display: "flex", gap: 14, padding: "14px 0", borderBottom: i < auditHook.items.length - 1 ? `1px solid ${G.border}` : "none", alignItems: "flex-start" }}>
+                            <div style={{ width: 8, height: 8, borderRadius: 99, background: meta.color, boxShadow: `0 0 8px ${meta.color}88`, flexShrink: 0, marginTop: 5 }}/>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: meta.color }}>{meta.icon} {meta.label}</div>
+                              {a.target_description && <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>— {a.target_description}</div>}
+                              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 2, fontFamily: "'DM Mono',monospace" }}>
+                                by {a.admin_id ?? "system"} · {ago(a.created_at)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                }
               </Card>
             </div>
-          )} {tab === "Settings" && (
-  <div className="sec">
-    <AdminSettings adminId={adminId} onToast={(msg) => push(msg)}/>
-  </div>
-)}
+          )}
 
         </main>
       </div>
