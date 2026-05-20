@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
 
   const PLANS = [
@@ -26,19 +27,31 @@ export default function RegisterPage() {
     { type: "Monthly", icon: "🗓" },
   ];
 
-  
-    async function handleGoogleRegister() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: "https://gg-app-3h69.vercel.app/dashboard",
-    },
-  });
+  // ✅ FIX 1: Added googleLoading state, prompt: "select_account" to force
+  // account picker, and proper error handling.
+  // ACTION REQUIRED: Make sure this exact URL is added to your Supabase dashboard:
+  //   Auth → URL Configuration → Redirect URLs → https://gg-app-3h69.vercel.app/dashboard
+  async function handleGoogleRegister() {
+    setError("");
+    setGoogleLoading(true);
 
-  if (error) {
-    setError(error.message);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://gg-app-3h69.vercel.app/dashboard",
+        queryParams: {
+          access_type: "offline",
+          prompt: "select_account", // Forces Google account picker every time
+        },
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+    // Note: if successful, the browser redirects — no need to setGoogleLoading(false)
   }
-}
 
   function validateStep1() {
     if (!fullName.trim()) {
@@ -46,13 +59,15 @@ export default function RegisterPage() {
       return false;
     }
 
-    if (!email.includes("@")) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       setError("Enter a valid email address");
       return false;
     }
 
-    if (phone.length < 10) {
-      setError("Enter a valid Nigerian phone number");
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10 || cleanPhone.length > 14) {
+      setError("Enter a valid phone number");
       return false;
     }
 
@@ -71,9 +86,7 @@ export default function RegisterPage() {
 
   function handleStep1() {
     setError("");
-
     if (!validateStep1()) return;
-
     setStep(2);
   }
 
@@ -87,18 +100,19 @@ export default function RegisterPage() {
 
     setLoading(true);
 
+    // ✅ FIX 2: Pass full_name in user metadata so auth user has a display name
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
     });
 
     if (authError || !data.user) {
-      console.log(authError);
-
-      setError(
-        authError?.message || "Registration failed"
-      );
-
+      setError(authError?.message || "Registration failed");
       setLoading(false);
       return;
     }
@@ -164,7 +178,6 @@ export default function RegisterPage() {
             opacity: 0;
             transform: translateY(20px);
           }
-
           to {
             opacity: 1;
             transform: translateY(0);
@@ -218,7 +231,7 @@ export default function RegisterPage() {
                 color: "#fff",
               }}
             >
-              God's Grace
+              God&apos;s Grace
             </div>
 
             <div
@@ -298,10 +311,7 @@ export default function RegisterPage() {
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    style={{
-                      ...inputStyle,
-                      paddingRight: 50,
-                    }}
+                    style={{ ...inputStyle, paddingRight: 50 }}
                   />
 
                   <button
@@ -335,8 +345,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={handleStep1}
                   style={{
-                    background:
-                      "linear-gradient(135deg,#007BFF,#0040ff)",
+                    background: "linear-gradient(135deg,#007BFF,#0040ff)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 12,
@@ -351,23 +360,65 @@ export default function RegisterPage() {
                   Continue →
                 </button>
 
+                {/* ✅ FIX 3: Google button with proper icon, loading state, and branding */}
                 <button
                   type="button"
                   onClick={handleGoogleRegister}
+                  disabled={googleLoading}
                   style={{
                     width: "100%",
-                    background: "#fff",
-                    color: "#000",
-                    border: "none",
+                    background: googleLoading ? "#e8e8e8" : "#fff",
+                    color: "#3c4043",
+                    border: "1px solid #dadce0",
                     borderRadius: 12,
                     padding: 14,
                     fontSize: 15,
-                    fontWeight: 700,
-                    cursor: "pointer",
+                    fontWeight: 600,
+                    cursor: googleLoading ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    transition: "background 0.2s",
                   }}
                 >
-                  Continue with Google
+                  {googleLoading ? (
+                    <span style={{ opacity: 0.6 }}>Redirecting...</span>
+                  ) : (
+                    <>
+                      {/* Google "G" SVG icon */}
+                      <svg width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                        <path fill="none" d="M0 0h48v48H0z"/>
+                      </svg>
+                      Continue with Google
+                    </>
+                  )}
                 </button>
+
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.4)",
+                    marginTop: 4,
+                  }}
+                >
+                  Already have an account?{" "}
+                  <span
+                    onClick={() => router.push("/login")}
+                    style={{
+                      color: "#007BFF",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Sign in
+                  </span>
+                </div>
               </div>
             )}
 
@@ -379,6 +430,10 @@ export default function RegisterPage() {
                   gap: 16,
                 }}
               >
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>
+                  Choose your savings plan and set your fixed contribution amount.
+                </div>
+
                 <select
                   value={planType}
                   onChange={(e) => setPlanType(e.target.value)}
@@ -397,7 +452,7 @@ export default function RegisterPage() {
 
                 <input
                   type="number"
-                  placeholder="Amount"
+                  placeholder="Amount (min ₦500)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   style={inputStyle}
@@ -411,8 +466,7 @@ export default function RegisterPage() {
                       flex: 1,
                       background: "rgba(255,255,255,0.05)",
                       color: "#fff",
-                      border:
-                        "1px solid rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: 12,
                       padding: 14,
                       cursor: "pointer",
@@ -436,12 +490,10 @@ export default function RegisterPage() {
                       padding: 14,
                       fontSize: 15,
                       fontWeight: 700,
-                      cursor: "pointer",
+                      cursor: loading ? "not-allowed" : "pointer",
                     }}
                   >
-                    {loading
-                      ? "Creating..."
-                      : "Create Account ✓"}
+                    {loading ? "Creating..." : "Create Account ✓"}
                   </button>
                 </div>
               </div>
@@ -465,15 +517,30 @@ export default function RegisterPage() {
                     color: "#fff",
                   }}
                 >
-                  Registration Successful
+                  Registration Successful!
+                </div>
+
+                {/* ✅ FIX 4: Email confirmation notice */}
+                <div
+                  style={{
+                    background: "rgba(0,123,255,0.1)",
+                    border: "1px solid rgba(0,123,255,0.3)",
+                    borderRadius: 12,
+                    padding: "14px 16px",
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.75)",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  📧 A confirmation email has been sent to <strong style={{ color: "#fff" }}>{email}</strong>.
+                  Please check your inbox and click the link to verify your account before logging in.
                 </div>
 
                 <button
                   type="button"
                   onClick={() => router.push("/login")}
                   style={{
-                    background:
-                      "linear-gradient(135deg,#007BFF,#0040ff)",
+                    background: "linear-gradient(135deg,#007BFF,#0040ff)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 12,
