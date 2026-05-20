@@ -16,8 +16,8 @@
  *
  * NO LOOP: useEffect([], []) — runs once; router.replace not push
  */
-
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useAuthGuard } from "@/lib/auth-guard";
 import { useRouter } from "next/navigation";
 import {
   useProfile, useMyContributions, useMyPayouts,
@@ -357,14 +357,9 @@ export default function DashboardPage() {
 
   // Auth guard — runs ONCE, no loop
   useEffect(() => {
-    const raw = localStorage.getItem("gg_user");
-    if (!raw) { router.replace("/login"); return; }
-    let u: any;
-    try { u = JSON.parse(raw); } catch { router.replace("/login"); return; }
-    if (u?.is_admin) { router.replace("/admin"); return; }  // admin goes to admin; replace prevents ping-pong
-    setUserId(u.id ?? "");
-    setAuthReady(true);
-  }, []); // ← empty array, runs exactly once
+    const { userId, displayName, ready, logout } = useAuthGuard("admin");
+
+if (!ready) return null;
 
   const profileHook = useProfile(authReady ? userId : "");
   const contribHook = useMyContributions(authReady ? userId : "");
