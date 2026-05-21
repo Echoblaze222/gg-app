@@ -10,6 +10,7 @@
  * ✅ NO loop: useEffect([]) runs once; router.replace not push
  */
 
+import AdminSettings from "@/components/AdminSettings";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -341,7 +342,7 @@ export default function AdminPage() {
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const TABS         = ["Overview", "Payouts", "Defaulters", "Members", "Audit Log"];
+    const TABS = ["Overview", "Payouts", "Defaulters", "Members", "Audit Log", "Settings"];
   const filteredPay  = filter === "All" ? payHook.items : payHook.items.filter(p => p.status === filter);
   const filteredMemb = membHook.items.filter(u =>
     u.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -739,7 +740,11 @@ export default function AdminPage() {
                 }
               </Card>
             </div>
-          )}
+          )} {tab === "Settings" && (
+  <div className="sec">
+    <AdminSettings adminId={adminId} onToast={(msg) => push(msg)}/>
+  </div>
+)}
 
         </main>
       </div>

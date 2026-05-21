@@ -17,6 +17,7 @@
  * NO LOOP: useEffect([], []) — runs once; router.replace not push
  */
 
+import PaymentDetails from "@/components/PaymentDetails";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -434,12 +435,13 @@ export default function DashboardPage() {
 
       {/* Modals */}
       {showPay && profile && (
-        <PaymentModal
-          fixedAmount={profile.fixed_amount}
-          onClose={() => setShowPay(false)}
-          onSuccess={onPaymentSuccess}
-        />
-      )}
+  <PaymentDetails
+    userId={userId}
+    fixedAmount={profile.fixed_amount}
+    onClose={() => setShowPay(false)}
+    onSuccess={onPaymentSuccess}
+  />
+)}
       {showPayout && profile && (
         <PayoutModal
           userId={userId}
