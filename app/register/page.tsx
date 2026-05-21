@@ -119,7 +119,7 @@ export default function RegisterPage() {
 
     const { error: profileError } = await supabase
       .from("profiles")
-      .insert({
+      .upsert({
         id: data.user.id,
         full_name: fullName,
         email,
