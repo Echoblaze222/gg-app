@@ -16,8 +16,8 @@
  *
  * NO LOOP: useEffect([], []) — runs once; router.replace not push
  */
-import { useState, useCallback } from "react";
-import { useAuthGuard } from "@/lib/auth-guard";
+
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   useProfile, useMyContributions, useMyPayouts,
@@ -355,11 +355,26 @@ export default function DashboardPage() {
   const [showPay,   setShowPay]   = useState(false);
   const [showPayout,setShowPayout]= useState(false);
 
-  // Auth guard — runs ONCE, no loop
+  // Auth guard — uses real Supabase session so RLS works
   useEffect(() => {
-    const { userId, displayName, ready, logout } = useAuthGuard("admin");
-
-if (!ready) return null;
+    async function checkAuth() {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data: { user }, error } = await sb.auth.getUser();
+      if (error || !user) { router.replace("/login"); return; }
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("id, is_admin, status")
+        .eq("id", user.id)
+        .single();
+      if (!profile) { router.replace("/login"); return; }
+      if (profile.status === "Suspended") { router.replace("/login"); return; }
+      if (profile.is_admin) { router.replace("/admin"); return; }
+      setUserId(profile.id);
+      setAuthReady(true);
+    }
+    checkAuth();
+  }, []); // runs exactly once
 
   const profileHook = useProfile(authReady ? userId : "");
   const contribHook = useMyContributions(authReady ? userId : "");
@@ -369,7 +384,12 @@ if (!ready) return null;
   const contributions= contribHook.items;
   const payouts      = payoutHook.items;
 
-  function logout() { localStorage.removeItem("gg_user"); router.replace("/login"); }
+  async function logout() {
+    const { createClient } = await import("@/lib/supabase/client");
+    const sb = createClient();
+    await sb.auth.signOut();
+    router.replace("/login");
+  }
 
   function onPaymentSuccess(c: Contribution) {
     contribHook.prepend(c);

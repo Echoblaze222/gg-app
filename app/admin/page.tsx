@@ -9,8 +9,8 @@
  * ✅ Audit log written to DB on every action
  * ✅ NO loop: useEffect([]) runs once; router.replace not push
  */
-import { useState, useCallback } from "react";
-import { useAuthGuard } from "@/lib/auth-guard";
+
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   useAdminStats, useAllPayouts, useAllMembers,
@@ -239,11 +239,27 @@ export default function AdminPage() {
   const [adminName, setAdminName] = useState("");
   const [adminId,   setAdminId]   = useState("");
 
-  // Auth guard — runs ONCE, no loop
+  // Auth guard — uses real Supabase session so RLS works
   useEffect(() => {
-    const { userId, displayName, ready, logout } = useAuthGuard("admin");
-
-if (!ready) return null;
+    async function checkAuth() {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data: { user }, error } = await sb.auth.getUser();
+      if (error || !user) { router.replace("/login"); return; }
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("id, full_name, is_admin, status")
+        .eq("id", user.id)
+        .single();
+      if (!profile) { router.replace("/login"); return; }
+      if (profile.status === "Suspended") { router.replace("/login"); return; }
+      if (!profile.is_admin) { router.replace("/dashboard"); return; }
+      setAdminName(profile.full_name ?? "Admin");
+      setAdminId(profile.id);
+      setAuthReady(true);
+    }
+    checkAuth();
+  }, []); // runs exactly once
 
   // ── Data hooks ────────────────────────────────────────────────────────────
   const statsHook  = useAdminStats();
@@ -262,7 +278,12 @@ if (!ready) return null;
   const [rejectTarget,setRejectTarget]= useState<Payout | null>(null);
 
   const go = (key: string, v: boolean) => setBusy(p => ({ ...p, [key]: v }));
-  const logout = () => { localStorage.removeItem("gg_user"); router.replace("/login"); };
+  async function logout() {
+    const { createClient } = await import("@/lib/supabase/client");
+    const sb = createClient();
+    await sb.auth.signOut();
+    router.replace("/login");
+  }
 
   // ── Payout actions ────────────────────────────────────────────────────────
   async function approve(p: Payout) {
