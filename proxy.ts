@@ -1,60 +1,45 @@
-// proxy.ts
-// Place at: gg-app/proxy.ts  (root of project)
+/**
+ * middleware.ts — place at project ROOT (next to app/ folder)
+ *
+ * This refreshes the Supabase session cookie on every request.
+ * Without this, auth.uid() = NULL on the server → RLS blocks everything.
+ */
 
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function proxy(req: NextRequest) {
-  let res = NextResponse.next({ request: req });
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
+  const sb = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return req.cookies.getAll();
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            req.cookies.set(name, value)
+            request.cookies.set(name, value)
           );
-          res = NextResponse.next({ request: req });
+          response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
+            response.cookies.set(name, value, options)
           );
         },
       },
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Refreshes the session — keeps auth.uid() alive for RLS
+  await sb.auth.getUser();
 
-  const path = req.nextUrl.pathname;
-
-  // Block /dashboard and /admin if not logged in
-  const isProtected =
-    path.startsWith("/dashboard") || path.startsWith("/admin");
-
-  if (isProtected && !user) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  // Redirect already-logged-in users away from login/register
-  const isAuthPage = path === "/login" || path === "/register";
-  if (isAuthPage && user) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-
-  return res;
+  return response;
 }
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/admin/:path*",
-    "/login",
-    "/register",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
