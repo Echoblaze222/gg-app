@@ -93,8 +93,8 @@ export default function RegisterPage() {
   async function handleRegister() {
     setError("");
 
-    if (!amount || Number(amount) < 500) {
-      setError("Minimum amount is ₦500");
+    if (!amount || Number(amount) < 200) {
+      setError("Minimum amount is ₦200");
       return;
     }
 
@@ -452,7 +452,7 @@ export default function RegisterPage() {
 
                 <input
                   type="number"
-                  placeholder="Amount (min ₦500)"
+                  placeholder="Amount (min ₦200)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   style={inputStyle}
