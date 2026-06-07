@@ -76,8 +76,14 @@ export default function PaymentDetails({
   const [submitting,setSubmitting]= useState(false);
   const [error,     setError]     = useState("");
 
-  // Reference members use when making the transfer
-  const reference = `GG-${userId.slice(0, 8).toUpperCase()}`;
+  // Reference members use when making the transfer.
+  // MUST be unique per contribution — include a timestamp so the same user
+  // can contribute multiple times without hitting the unique constraint on
+  // contributions.reference. useState (not a plain const) means it is
+  // generated exactly once when the modal mounts and never changes on re-render.
+  const [reference] = useState(
+    () => `GG-${userId.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
+  );
 
   async function confirmPayment() {
     setSubmitting(true); setError("");
