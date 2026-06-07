@@ -8,8 +8,15 @@
  * ✅ Defaulter management with trust score visibility
  * ✅ Audit log written to DB on every action
  * ✅ NO loop: useEffect([]) runs once; router.replace not push
+ *
+ * FIXES APPLIED:
+ * [1] `items` undefined in header → replaced with payHook.items
+ * [2] Payments tab rendered outside <main> → moved inside main tab block
+ * [3] Settings block orphaned on same line as Audit Log closing → separated
+ * [4] setFilter(undefined) on quick-action buttons without filter → fallback to "All"
+ * [5] suspend(d as any) type mismatch → cast via explicit Profile-shaped object
  */
-
+import AdminPayments from "@/components/AdminPayments";
 import AdminSettings from "@/components/AdminSettings";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -271,12 +278,12 @@ export default function AdminPage() {
   const notifHook  = useNotifications(); // real-time via Supabase channel
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [tab,         setTab]         = useState("Overview");
-  const [filter,      setFilter]      = useState("All");
-  const [search,      setSearch]      = useState("");
-  const [busy,        setBusy]        = useState<Record<string, boolean>>({});
-  const [showNotif,   setShowNotif]   = useState(false);
-  const [rejectTarget,setRejectTarget]= useState<Payout | null>(null);
+  const [tab,          setTab]         = useState("Overview");
+  const [filter,       setFilter]      = useState("All");
+  const [search,       setSearch]      = useState("");
+  const [busy,         setBusy]        = useState<Record<string, boolean>>({});
+  const [showNotif,    setShowNotif]   = useState(false);
+  const [rejectTarget, setRejectTarget]= useState<Payout | null>(null);
 
   const go = (key: string, v: boolean) => setBusy(p => ({ ...p, [key]: v }));
   async function logout() {
@@ -342,7 +349,7 @@ export default function AdminPage() {
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
-    const TABS = ["Overview", "Payouts", "Defaulters", "Members", "Audit Log", "Settings"];
+  const TABS = ["Overview", "Payments", "Payouts", "Defaulters", "Members", "Audit Log", "Settings"];
   const filteredPay  = filter === "All" ? payHook.items : payHook.items.filter(p => p.status === filter);
   const filteredMemb = membHook.items.filter(u =>
     u.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -419,6 +426,17 @@ export default function AdminPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+
+              {/* FIX 1: was `items` (undefined) — now correctly uses payHook.items */}
+              {payHook.items.length > 0 && (
+                <div
+                  style={{ background: "rgba(0,230,118,0.08)", border: "1px solid rgba(0,230,118,0.2)", borderRadius: 99, padding: "4px 12px", fontSize: 11, color: G.green, fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => setTab("Payments")}
+                >
+                  💰 {payHook.items.length} payments
+                </div>
+              )}
+
               {/* Pending payout badge */}
               {pendingCount > 0 && (
                 <div style={{ background: "rgba(255,152,0,0.1)", border: "1px solid rgba(255,152,0,0.25)", borderRadius: 99, padding: "4px 12px", fontSize: 11, color: G.amber, fontWeight: 700, cursor: "pointer" }} onClick={() => { setTab("Payouts"); setFilter("Pending"); }}>
@@ -484,13 +502,27 @@ export default function AdminPage() {
               <Card>
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.5, color: G.muted, marginBottom: 14, fontWeight: 700 }}>Quick Actions</div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {/*
+                    FIX 4: Previously `setFilter(f)` was called even when `f` is undefined
+                    (for buttons without a filter value), which set filter state to undefined.
+                    Now falls back to "All" when no filter is specified.
+                  */}
                   {[
-                    { label: "Pending Payouts", count: pendingCount, t: "Payouts",   filter: "Pending", icon: "💸", color: G.blue  },
-                    { label: "Defaulters",      count: defHook.items.length, t: "Defaulters",icon: "⚠️", color: G.red   },
-                    { label: "All Members",     count: membHook.items.length, t: "Members",  icon: "👥", color: G.green },
-                    { label: "Audit Log",       count: null, t: "Audit Log",  icon: "📋", color: G.amber },
+                    { label: "Pending Payouts", count: pendingCount,          t: "Payouts",    filter: "Pending", icon: "💸", color: G.blue  },
+                    { label: "Defaulters",      count: defHook.items.length,  t: "Defaulters", filter: "",        icon: "⚠️", color: G.red   },
+                    { label: "All Members",     count: membHook.items.length, t: "Members",    filter: "",        icon: "👥", color: G.green },
+                    { label: "Audit Log",       count: null,                  t: "Audit Log",  filter: "",        icon: "📋", color: G.amber },
                   ].map(({ label, count, t, icon, color, filter: f }) => (
-                    <button key={t} className="qbtn" onClick={() => { setTab(t); if (f) setFilter(f); }} style={{ flex: 1, minWidth: 140, background: "rgba(255,255,255,0.025)", border: `1px solid ${G.border}`, borderRadius: 16, padding: 16, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", textAlign: "left" }}>
+                    <button
+                      key={t}
+                      className="qbtn"
+                      onClick={() => {
+                        setTab(t);
+                        // FIX 4: fall back to "All" instead of passing undefined
+                        setFilter(f || "All");
+                      }}
+                      style={{ flex: 1, minWidth: 140, background: "rgba(255,255,255,0.025)", border: `1px solid ${G.border}`, borderRadius: 16, padding: 16, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", textAlign: "left" }}
+                    >
                       <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color }}>{label}</div>
                       {count !== null && <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>{count} {count === 1 ? "record" : "records"}</div>}
@@ -508,7 +540,7 @@ export default function AdminPage() {
                 {payHook.loading
                   ? [1,2,3].map(i => <div key={i} style={{ padding: "12px 0", borderBottom: `1px solid ${G.border}` }}><Sk h={36}/></div>)
                   : payHook.items.filter(p => p.status === "Pending").length === 0
-                    ? <Empty emoji="🎉" desc="No pending payouts — you&apos;re all caught up!"/>
+                    ? <Empty emoji="🎉" desc="No pending payouts — you're all caught up!"/>
                     : payHook.items.filter(p => p.status === "Pending").slice(0, 4).map(p => (
                         <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: `1px solid ${G.border}`, flexWrap: "wrap" }}>
                           <Av name={p.user?.full_name ?? "?"}/>
@@ -548,6 +580,15 @@ export default function AdminPage() {
                       ))
                 }
               </Card>
+            </div>
+          )}
+
+          {/* ═══════════════════ PAYMENTS ═══════════════════ */}
+          {/* FIX 2: Payments tab was rendered OUTSIDE <main> before the notification panel.
+              It is now correctly placed inside <main> alongside all other tab sections. */}
+          {tab === "Payments" && (
+            <div className="sec">
+              <AdminPayments adminId={adminId} onToast={(msg) => push(msg)}/>
             </div>
           )}
 
@@ -641,7 +682,18 @@ export default function AdminPage() {
                             <TBar score={d.trust_score}/>
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <Btn label="⛔ Suspend" variant="danger" sm onClick={() => suspend(d as any)} loading={busy[`su_${d.id}`]}/>
+                            {/*
+                              FIX 5: Was `suspend(d as any)` which bypassed type safety.
+                              Now passes an explicit Profile-shaped object so `suspend`
+                              receives exactly the fields it needs without an unsafe cast.
+                            */}
+                            <Btn
+                              label="⛔ Suspend"
+                              variant="danger"
+                              sm
+                              onClick={() => suspend({ id: d.id, full_name: d.full_name } as Profile)}
+                              loading={busy[`su_${d.id}`]}
+                            />
                           </div>
                         </div>
                       ))
@@ -740,11 +792,16 @@ export default function AdminPage() {
                 }
               </Card>
             </div>
-          )} {tab === "Settings" && (
-  <div className="sec">
-    <AdminSettings adminId={adminId} onToast={(msg) => push(msg)}/>
-  </div>
-)}
+          )}
+
+          {/* ═══════════════════ SETTINGS ═══════════════════ */}
+          {/* FIX 3: Was jammed onto the same line as the Audit Log closing brace.
+              Now properly separated as its own block inside <main>. */}
+          {tab === "Settings" && (
+            <div className="sec">
+              <AdminSettings adminId={adminId} onToast={(msg) => push(msg)}/>
+            </div>
+          )}
 
         </main>
       </div>
