@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-const sb = createClient();
+const sb = createClientComponentClient();
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -87,11 +87,43 @@ export async function checkBalance(userId: string, requestedAmount: number): Pro
 export async function dbMakeContribution(userId: string, amount: number, reference?: string) {
   const { data, error } = await sb
     .from("contributions")
-    .insert({ user_id: userId, amount, status: "confirmed", reference: reference ?? null, channel: reference ? "paystack" : "manual" })
+    .insert({
+      user_id:   userId,
+      amount,
+      status:    "pending_verification",
+      reference: reference ?? null,
+      channel:   reference ? "paystack" : "manual",
+    })
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function dbConfirmContribution(id: string, adminId: string) {
+  const { error } = await sb
+    .from("contributions")
+    .update({ status: "confirmed", verified_by: adminId, verified_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+  await sb.from("audit_logs").insert({
+    action: "confirm_payment",
+    admin_id: adminId,
+    target_description: "Contribution " + id + " confirmed",
+  });
+}
+
+export async function dbRejectContribution(id: string, adminId: string, note?: string) {
+  const { error } = await sb
+    .from("contributions")
+    .update({ status: "rejected", verified_by: adminId, verified_at: new Date().toISOString(), admin_note: note ?? null })
+    .eq("id", id);
+  if (error) throw error;
+  await sb.from("audit_logs").insert({
+    action: "reject_payment",
+    admin_id: adminId,
+    target_description: "Contribution " + id + " rejected",
+  });
 }
 
 export async function dbRequestPayout(userId: string, payload: {
@@ -296,6 +328,45 @@ export function useDefaulters() {
   return { items, loading, refetch: fetch, remove };
 }
 
+
+// ── HOOK: Admin — Pending Contributions ──────────────────────────────────────
+export type PendingContribution = {
+  id: string; user_id: string; amount: number;
+  reference: string | null; channel: string; created_at: string;
+  status: string; admin_note: string | null;
+  profile: { full_name: string; phone: string; email: string } | null;
+};
+
+export function usePendingContributions() {
+  const [items,   setItems]   = useState<PendingContribution[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const { data } = await sb
+      .from("contributions")
+      .select("*, profiles!contributions_user_id_fkey(full_name, phone, email)")
+      .eq("status", "pending_verification")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    const shaped = (data ?? []).map((c: any) => ({
+      ...c,
+      profile: c.profiles ?? null,
+    }));
+    setItems(shaped);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const remove = useCallback((id: string) => {
+    setItems(p => p.filter(x => x.id !== id));
+  }, []);
+
+  return { items, loading, refetch: fetch, remove };
+}
+
 // ── HOOK: Admin — Stats ───────────────────────────────────────────────────────
 export function useAdminStats() {
   const [stats,   setStats]   = useState<AdminStats | null>(null);
@@ -357,7 +428,7 @@ export function useNotifications() {
     // Subscribe to real-time inserts on notifications table
     channelRef.current = sb
       .channel("admin-notifications")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: { new: Record<string, any> }) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload) => {
         setItems(p => [payload.new as Notification, ...p].slice(0, 50));
       })
       .subscribe();
