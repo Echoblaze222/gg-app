@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@/lib/supabase/client";
 
-const sb = createClientComponentClient();
+const sb = createClient();
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
