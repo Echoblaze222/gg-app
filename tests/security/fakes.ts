@@ -1,6 +1,7 @@
 /** Test doubles for AI-2 security tests. Only imported from tests. */
 import type { RequestContext } from "@/contracts/services";
-import type { AuditRepository, MemberRepository, RoleRepository } from "@/contracts/repositories";
+import type { AuditRepository, MemberRepository, RateLimitRepository, RoleRepository } from "@/contracts/repositories";
+import type { SecurityEventService } from "@/contracts/services";
 import type { Member } from "@/contracts/entities";
 import type { MemberStatus, Role } from "@/contracts/enums";
 import { DEFAULT_ROLE_PERMISSIONS } from "@/contracts/permissions";
@@ -63,4 +64,31 @@ export function fakeAuditRepo(opts: { fail?: boolean } = {}): AuditRepository & 
 export function fakeLogger(): SecurityLogger & { errors: unknown[][] } {
   const errors: unknown[][] = [];
   return { errors, error: (...args: unknown[]) => { errors.push(args); }, warn: () => {} };
+}
+
+export function fakeRateRepo(opts: { fail?: boolean } = {}): RateLimitRepository & { counts: Map<string, number>; keys: string[] } {
+  const counts = new Map<string, number>();
+  const keys: string[] = [];
+  return {
+    counts,
+    keys,
+    hit: async (key) => {
+      if (opts.fail) throw new Error("counter store down");
+      keys.push(key);
+      const n = (counts.get(key) ?? 0) + 1;
+      counts.set(key, n);
+      return { count: n, windowEndsAt: "2026-01-01T00:01:00Z" };
+    },
+  };
+}
+
+export function fakeSecurityEvents(opts: { fail?: boolean } = {}): SecurityEventService & { events: { type: string; severity: string; detail?: Record<string, unknown> }[] } {
+  const events: { type: string; severity: string; detail?: Record<string, unknown> }[] = [];
+  return {
+    events,
+    record: async (_ctx, e) => {
+      if (opts.fail) throw new Error("event store down");
+      events.push(e as never);
+    },
+  };
 }
