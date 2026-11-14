@@ -1,0 +1,67 @@
+# One owner per path. Workstreams are listed in docs/architecture/ownership.md.
+# GitHub can only name accounts, so every path maps to the repository owner.
+# The comment above each group names the workstream that does the work.
+
+# Integrator: shared files and contracts
+/package.json                 @Echoblaze222
+/package-lock.json            @Echoblaze222
+/tsconfig.json                @Echoblaze222
+/next.config.ts               @Echoblaze222
+/app/layout.tsx               @Echoblaze222
+/.env.example                 @Echoblaze222
+/.github/CODEOWNERS           @Echoblaze222
+/.github/pull_request_template.md @Echoblaze222
+/contracts/                   @Echoblaze222
+/tests/contract/              @Echoblaze222
+/vitest.config.mts            @Echoblaze222
+/vitest.db.config.mts         @Echoblaze222
+/playwright.config.ts         @Echoblaze222
+
+# AI-1 data foundation and platform
+/supabase/migrations/1*       @Echoblaze222
+/supabase/seed/               @Echoblaze222
+/lib/db/                      @Echoblaze222
+/lib/supabase/                @Echoblaze222
+/lib/observability/           @Echoblaze222
+/lib/env.ts                   @Echoblaze222
+/.github/workflows/           @Echoblaze222
+/docs/architecture/           @Echoblaze222
+/tests/db/                    @Echoblaze222
+
+# AI-2 security and auth logic
+/supabase/migrations/2*       @Echoblaze222
+/lib/security/                @Echoblaze222
+/lib/auth/                    @Echoblaze222
+/proxy.ts                     @Echoblaze222
+/app/api/auth/                @Echoblaze222
+/docs/security/               @Echoblaze222
+
+# AI-3 design system, motion, marketing site, auth UI
+/components/ui/               @Echoblaze222
+/components/motion/           @Echoblaze222
+/components/brand/            @Echoblaze222
+/styles/                      @Echoblaze222
+/lib/motion/                  @Echoblaze222
+/public/brand/                @Echoblaze222
+/app/(marketing)/             @Echoblaze222
+/app/(auth)/                  @Echoblaze222
+/docs/design/                 @Echoblaze222
+
+# AI-4 payments and contribution engine
+/supabase/migrations/4*       @Echoblaze222
+/lib/payments/                @Echoblaze222
+/lib/contributions/           @Echoblaze222
+/lib/ledger/                  @Echoblaze222
+/app/api/payments/            @Echoblaze222
+/app/api/webhooks/            @Echoblaze222
+/docs/payments/               @Echoblaze222
+
+# AI-5 user app, admin app, notifications, support, legal
+/supabase/migrations/5*       @Echoblaze222
+/app/(user)/                  @Echoblaze222
+/app/(admin)/                 @Echoblaze222
+/lib/notifications/           @Echoblaze222
+/lib/support/                 @Echoblaze222
+/lib/legal/                   @Echoblaze222
+/components/features/         @Echoblaze222
+/docs/product/                @Echoblaze222
