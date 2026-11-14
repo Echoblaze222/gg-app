@@ -1,6 +1,6 @@
 # Payments and Contribution Engine: Spec (AI-4)
 
-Status: milestone 0. Spec only, no application code yet.
+Status: M0 (this spec) and M1 (pure domain code in `lib/ledger`, `lib/contributions`, `lib/payments`) are done. M2 onward not started.
 Owner of this document: AI-4. Contract version this was written against: 1.0.0.
 
 ## 1. Sources and what they settled
@@ -75,7 +75,7 @@ Reference format: `gg-` plus 20 random characters from a Crockford base32 alphab
 
 Provider timeout during initialize: the attempt stays `initiating`. We do not retry initialize with a new reference. Reconciliation verifies the reference later. A timeout during initialize returns `PAYMENT_PROVIDER_TIMEOUT` (money moved: unknown).
 
-Attempt expiry: an attempt in `initiating` or `awaiting_authentication` older than `payment.attempt_expiry_minutes` is verified once, then moved to `expired` if the provider says `abandoned`.
+Attempt expiry: an attempt in `initiating`, `awaiting_authentication` or `processing` older than `payment.attempt_expiry_minutes` is verified once, then moved to `expired` if the provider says `abandoned`. `pathToExpired` encodes the steps. `verifying` cannot expire directly and steps back to `processing` first.
 
 ### 5.2 Settlement (`verifyAndSettle`)
 
@@ -84,12 +84,12 @@ One function, three callers: the browser return route, the webhook handler, the 
 Steps, in this order. Each step is safe to repeat:
 1. Load the attempt by reference. Unknown reference: `NOT_FOUND`. The caller must own the attempt, except system callers.
 2. If the attempt is terminal, return it. Nothing else happens.
-3. Compare and set the attempt to `verifying` from `processing` or `awaiting_authentication`. A null result means someone else is settling. Re-read and return.
+3. Move the attempt to `verifying` with `pathToVerifying` (lib/payments/transitions.ts). The contract allows `verifying` only from `processing`, so `initiating` and `awaiting_authentication` pass through `processing` first, one compare and set per step. A null result on any step means someone else is settling. Re-read and return.
 4. Call the provider verify with a timeout.
 5. Map the provider status:
    - `success`: check A2. On match go to step 6. On mismatch open a reconciliation record with `PROVIDER_VERIFY_MISMATCH`, move the attempt to `failed`, post nothing.
    - `failed`: move to `failed` with a failure code. Publish `payment.failed`.
-   - `abandoned`: leave non terminal until expiry.
+   - `abandoned`: step back from `verifying` to `processing` (allowed by the contract) and leave it there until expiry.
    - `ongoing`: transition `verifying` back to `processing` (allowed by the contract) and stop.
    - `reversed`: see section 11.
    - any other value: treat as `ongoing`. Never as success.
@@ -261,7 +261,7 @@ Each milestone is one PR into `integration` with test output pasted in.
 | M | Content | Evidence |
 |---|---------|----------|
 | M0 | This spec and the handoffs | Review |
-| M1 | Pure domain: money helpers, schedule, obligation status, reference and receipt number generation, state transition guards | Unit and property tests, lint, typecheck |
+| M1 | Pure domain: money helpers, schedule, time based obligation status, reference, receipt number and charge key generation, transition guards and settlement paths, the verification decision (A2, A3) | Unit tests, exhaustive calendar checks, mutation check, lint, typecheck |
 | M2 | Provider interface, Paystack adapter, fake provider, fixtures | Contract tests |
 | M3 | Payment service: initiate, settle, webhook processing, with in memory repositories | Full failure matrix tests |
 | M4 | Saved cards, charge runner, retry policy, notifications | Runner crash and resume tests |
