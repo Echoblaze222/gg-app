@@ -1,10 +1,10 @@
 # AI-3 to Integrator: root setup requests
 
-What I need, why, what I assumed, impact. None of these stop M1. Each stops the deliverable named.
+Status after the owner authorized me on 2026-11-14.
 
-1. **`app/layout.tsx`: attach fonts.** Import `fontVariables` from `@/styles/fonts` and put it on `<html className={fontVariables}>`. Why: Instrument Serif and Geist load only when this is wired. Assumed: you own the file. Impact: marketing and auth look generic until done. Please run a full `next build` on Vercel after, because the build container I use cannot download Google fonts and I could not test it.
-2. **`next.config.ts`: `experimental: { viewTransition: true }`.** Why: shared element page transitions (Next 16 guide `01-app/02-guides/view-transitions.md`). Impact: blocks M3 page transitions only.
-3. **`tests/setup.ts`: add `afterEach(cleanup)` from `@testing-library/react`.** Why: Vitest runs without globals, so Testing Library does not clean up between tests and later tests see earlier renders. My test files call `cleanup` themselves for now, so this is optional.
-4. **`vitest.config.mts` include list.** It covers `components/**/*.test.tsx` and `lib/**/*.test.ts`. Page level tests under `app/**` and style checks would need `app/**/*.test.tsx`. Optional, needed from M4 (auth screens).
-5. **Lockfile.** `package-lock.json` is not in the repo (ADR-012). I did not commit the one my install generated. Please commit one from your own install.
+1. **`app/layout.tsx`: attach fonts. DONE by AI-3 on `ai/3-design` (owner approved), commit "wire fonts".** `fontVariables` is on `<html>`. Checked with a webpack build using mocked Google Fonts responses: the three variable classes are on `<html>` and `--font-display-loaded`, `--font-body-loaded`, `--font-mono-loaded` are emitted. Integrator: keep this edit when merging, and run one real `next build` on Vercel because I could not download fonts here.
+2. **`next.config.ts` viewTransition flag: WITHDRAWN.** I first asked for `experimental.viewTransition`. The guide shipped with the installed Next 16.4.6 says view transitions need no configuration, and TypeScript rejects the flag. Nothing to do. Open item for M3: installed `react` is 19.2.4 and does not export `ViewTransition`; I will check types and runtime before using it.
+3. **`tests/setup.ts`: add `afterEach(cleanup)` from `@testing-library/react`.** Vitest runs without globals, so Testing Library does not clean up between tests. My test files call `cleanup` themselves, so this is optional.
+4. **`vitest.config.mts` include list.** It covers `components/**/*.test.tsx` and `lib/**/*.test.ts`. Page level tests under `app/**` need `app/**/*.test.tsx`. Optional, needed from the auth screens milestone.
+5. **Lockfile: STILL OPEN, needs the Integrator.** `package-lock.json` is not in the repo (ADR-012) and is too large for me to push through the GitHub connector. Please commit one from your own install.
 6. **Gallery visibility.** `/design-gallery` returns 404 whenever `NODE_ENV` is production, which includes Vercel preview deployments. If the owner wants it on previews, tell me which flag to read and add it to `.env.example`.
