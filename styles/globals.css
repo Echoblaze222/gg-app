@@ -1,1 +1,40 @@
 @import "tailwindcss";
+@import "./tokens.css";
+@import "./components/button.css";
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 100%;
+    line-height: var(--leading-normal);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  /* Visible keyboard focus everywhere. Components may refine it but never remove it. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Safety net for reduced motion: any animation or transition that forgets its own fallback is cut short.
+ * Components still define their own reduced motion rendering (static icon plus text) before this applies.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
