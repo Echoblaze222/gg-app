@@ -42,3 +42,10 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# test output
+/playwright-report
+/test-results
+
+# keep the names-only example committed
+!.env.example

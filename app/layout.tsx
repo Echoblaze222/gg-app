@@ -1,22 +1,15 @@
-// app/layout.tsx
 import type { Metadata } from "next";
+import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "God's Grace Fintech",
-  description: "Thrift & Ajo savings platform",
-  icons: { icon: "/logo.svg" },
+  title: "GG Contribution",
+  description: "Save on your own schedule and request your money when you need it.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0, background: "#000", color: "#fff" }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

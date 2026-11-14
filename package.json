@@ -6,24 +6,49 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db": "vitest run --config vitest.db.config.mts",
+    "test:e2e": "playwright test",
+    "db:types": "supabase gen types typescript --local > contracts/db-types.ts"
   },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.106.0",
-    "next": "16.2.4",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
+    "motion": "14.14.0",
+    "next": "16.4.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1",
+    "@tailwindcss/postcss": "4.2.4",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.10",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.3.0",
+    "@vitest/coverage-v8": "5.1.0",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.4.6",
+    "jsdom": "31.0.1",
+    "pg": "8.23.1",
+    "supabase": "3.1.0",
+    "tailwindcss": "4.2.4",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
