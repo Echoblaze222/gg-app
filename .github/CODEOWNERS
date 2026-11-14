@@ -35,6 +35,7 @@
 /proxy.ts                     @Echoblaze222
 /app/api/auth/                @Echoblaze222
 /docs/security/               @Echoblaze222
+/tests/security/              @Echoblaze222
 
 # AI-3 design system, motion, marketing site, auth UI
 /components/ui/               @Echoblaze222
