@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "./tokens.css";
 @import "./components/button.css";
+@import "./components/input.css";
+@import "./components/card.css";
 
 @layer base {
   html {

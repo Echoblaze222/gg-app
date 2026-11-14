@@ -4,7 +4,7 @@ Read this before building any screen. Import from `@/components/ui` and `@/lib/m
 
 Gallery: `/design-gallery` (development only, ADR-008). It shows every state of every component below.
 
-Updated: 2026-11-14, milestone M1.
+Updated: 2026-11-14, milestone M2 (Input and Card added).
 
 ## Ready
 
@@ -26,6 +26,19 @@ import { Button } from "@/components/ui";
 
 Behavior you can rely on: loading and success lock the button (no double submit, a submit button will not submit); failure stays pressable for retry; the loader ring appears only after 300 ms; reduced motion shows a static ring; focus stays on the button during loading.
 
+### Input (`components/ui/Input.tsx`)
+```tsx
+<Input label="Phone number" name="phone" type="tel" inputMode="tel" autoComplete="tel-national" prefix="+234" hint="We send a code by SMS." error={fieldErrors.phone} />
+```
+Props: `label` (required, real label that floats), `hint`, `error` (what is wrong and how to fix it), `prefix`, `trailing`, plus any normal input attribute and `ref`. The error shows an icon and text, sets `aria-invalid`, and is announced politely. 56 px tall, 16 px text. Spec: `docs/design/specs/input-and-card.md`.
+
+### Card (`components/ui/Card.tsx`)
+```tsx
+<Card>...</Card>                       // white card
+<Card tone="ink" padding="lg">...</Card> // black hero card, text is white
+```
+`as` can be `div`, `section` or `article`.
+
 ### Motion primitives (`@/lib/motion`, `@/components/motion`)
 - `useReducedMotion()`: true when the system asks for less motion.
 - `useDelayedFlag(active, delayMs = 300)`: true only after `active` stayed true for the delay. Use it for any loader.
@@ -38,4 +51,4 @@ Names are frozen in `contracts/design-tokens.md`. In Tailwind: `bg-canvas`, `bg-
 Rules: one accent hue; status is never color alone (icon and text too); card hairlines use `border-ink/10`, controls use `border-border`.
 
 ## Next (in this order)
-Inputs (pill, floating label, phone prefix), cards, feedback (alert, toast, skeleton, empty, error, success), sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens, marketing site.
+Feedback (alert, toast, skeleton, empty, error, success), sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens, marketing site.

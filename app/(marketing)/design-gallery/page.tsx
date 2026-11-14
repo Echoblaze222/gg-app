@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Button } from "@/components/ui";
+import { Button, Card, Input } from "@/components/ui";
 import type { ButtonProps } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Design gallery", robots: { index: false, follow: false } };
@@ -79,6 +79,39 @@ export default function DesignGalleryPage() {
             <Button variant="accent">Contribute</Button>
           </Row>
         </div>
+      </section>
+
+      <section className="grid gap-6" aria-labelledby="gallery-input">
+        <h2 id="gallery-input" className="text-2xl">
+          Input
+        </h2>
+        <div className="grid gap-5 rounded-lg border border-ink/10 bg-surface p-4">
+          <Input label="Full name" name="gallery-name" autoComplete="name" />
+          <Input label="Email" name="gallery-email" type="email" autoComplete="email" defaultValue="ada@example.com" />
+          <Input label="Hover" name="gallery-hover" preview="hover" />
+          <Input label="Focus" name="gallery-focus" preview="focus" />
+          <Input label="Phone number" name="gallery-phone" type="tel" inputMode="tel" autoComplete="tel-national" prefix="+234" hint="We send a code by SMS." />
+          <Input label="Password" name="gallery-password" type="password" autoComplete="new-password" trailing={<Button variant="quiet" type="button">Show</Button>} />
+          <Input label="Amount" name="gallery-amount" inputMode="numeric" defaultValue="5000" error="Enter an amount between 1,000 and 500,000." />
+          <Input label="Disabled" name="gallery-disabled" disabled defaultValue="Locked" />
+        </div>
+      </section>
+
+      <section className="grid gap-6" aria-labelledby="gallery-card">
+        <h2 id="gallery-card" className="text-2xl">
+          Card
+        </h2>
+        <Card>
+          <h3 className="text-lg font-medium">White card</h3>
+          <p className="text-ink-muted">Groups related content on the page.</p>
+        </Card>
+        <Card tone="ink" padding="lg">
+          <p className="text-sm text-ink-inverse/70">Your balance</p>
+          <p className="font-display text-4xl">₦ 125,000</p>
+          <div className="mt-4">
+            <Button variant="secondary">Request money</Button>
+          </div>
+        </Card>
       </section>
     </main>
   );
