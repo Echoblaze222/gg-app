@@ -16,6 +16,8 @@
 /vitest.config.mts            @Echoblaze222
 /vitest.db.config.mts         @Echoblaze222
 /playwright.config.ts         @Echoblaze222
+/docs/ops/                    @Echoblaze222
+/docs/handoffs/integrator-*   @Echoblaze222
 
 # AI-1 data foundation and platform
 /supabase/migrations/1*       @Echoblaze222
@@ -35,6 +37,7 @@
 /proxy.ts                     @Echoblaze222
 /app/api/auth/                @Echoblaze222
 /docs/security/               @Echoblaze222
+/tests/security/              @Echoblaze222
 
 # AI-3 design system, motion, marketing site, auth UI
 /components/ui/               @Echoblaze222
@@ -63,5 +66,6 @@
 /lib/notifications/           @Echoblaze222
 /lib/support/                 @Echoblaze222
 /lib/legal/                   @Echoblaze222
+/lib/admin/                   @Echoblaze222
 /components/features/         @Echoblaze222
 /docs/product/                @Echoblaze222
