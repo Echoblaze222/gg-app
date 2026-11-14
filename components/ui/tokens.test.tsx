@@ -71,6 +71,17 @@ describe("text contrast is at least 4.5 to 1", () => {
   }
 });
 
+describe("info alert tint (accent mixed into the surface)", () => {
+  it("keeps accent text readable on the tint", () => {
+    const hex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+    const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const [a, s] = [rgb(color("accent")), rgb(color("surface"))];
+    const tint = hex(a.map((v, i) => v * 0.1 + s[i] * 0.9));
+    expect(ratio(color("accent"), tint)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(color("ink"), tint)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 describe("interface component contrast is at least 3 to 1", () => {
   for (const bg of ["canvas", "surface"]) {
     it(`border on ${bg}`, () => expect(ratio(color("border"), color(bg))).toBeGreaterThanOrEqual(3));
@@ -81,7 +92,7 @@ describe("interface component contrast is at least 3 to 1", () => {
     expect(block).not.toBeNull();
     const ring = block![1].match(/--color-focus-ring\s*:\s*(#[0-9a-f]{6})/i);
     expect(ring).not.toBeNull();
-    expect(ratio(ring![1], color("ink"))).toBeGreaterThanOrEqual(3);
+    expect(ratio(ring![1], color("ink"))).toBeGreaterThanOrEqual(4.5 - 1.5);
   });
 });
 

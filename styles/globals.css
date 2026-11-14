@@ -3,6 +3,9 @@
 @import "./components/button.css";
 @import "./components/input.css";
 @import "./components/card.css";
+@import "./components/alert.css";
+@import "./components/skeleton.css";
+@import "./components/toast.css";
 
 @layer base {
   html {
