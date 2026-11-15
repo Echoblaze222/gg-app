@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORT_TICKET_STATUSES } from "../../contracts/enums";
 import { supportTicketInputSchema, uuidSchema } from "../../contracts/schemas";
 
 /** NUL characters cannot be stored in text columns and would turn a form mistake into a server error. */
@@ -14,3 +15,9 @@ export const replyInputSchema = z.object({
   ticketId: uuidSchema,
   body: z.string().trim().min(1).max(4000).refine(noNul, NO_NUL_MESSAGE),
 });
+
+export const ticketIdInputSchema = z.object({ ticketId: uuidSchema });
+
+export const listForStaffInputSchema = z.object({ status: z.enum(SUPPORT_TICKET_STATUSES).optional() });
+
+export const setStatusInputSchema = z.object({ ticketId: uuidSchema, status: z.enum(SUPPORT_TICKET_STATUSES) });

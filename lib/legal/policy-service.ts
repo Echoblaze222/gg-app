@@ -2,11 +2,12 @@ import type { PolicyAcceptance, PolicyVersion } from "../../contracts/entities";
 import { POLICY_KINDS } from "../../contracts/enums";
 import { AppError } from "../../contracts/errors";
 import { policyKindSchema } from "../../contracts/schemas";
-import type { PolicyService } from "../../contracts/services";
+import type { PolicyServiceV11 } from "../../contracts/v1_1";
 import { fail, failFrom, ok } from "../notifications/result";
 import { fieldsFromZod } from "../notifications/schemas";
 import { createKit, type KitDeps } from "../support/kit";
-import { policyAcceptInputSchema } from "./schemas";
+import { policyRepo } from "../support/v11";
+import { policyAcceptInputSchema, policyPublishInputSchema } from "./schemas";
 
 export interface PolicyServiceDeps extends KitDeps {
   /** Reference for failures of calls that carry no request context (public policy reads). */
@@ -38,7 +39,7 @@ export function latestPublished(versions: readonly PolicyVersion[], nowMs: numbe
   return best;
 }
 
-export function createPolicyService(deps: PolicyServiceDeps): PolicyService {
+export function createPolicyService(deps: PolicyServiceDeps): PolicyServiceV11 {
   const kit = createKit(deps);
   const newReference = deps.newReference ?? (() => globalThis.crypto.randomUUID());
 
@@ -122,6 +123,55 @@ export function createPolicyService(deps: PolicyServiceDeps): PolicyService {
           return scope;
         }
         return ok(await scope.reads.policies.listAcceptances(scope.memberId));
+      });
+    },
+
+    /** The current version of each kind that this member has not accepted. Drafts count, so members accept them before launch too. */
+    listUnaccepted(ctx) {
+      return kit.guard<PolicyVersion[]>(ctx, async () => {
+        const scope = await kit.memberScope(ctx, "member.profile.read");
+        if (!scope.ok) {
+          return scope;
+        }
+        const nowMs = kit.now().getTime();
+        const writes = kit.writes();
+        const lists = await Promise.all(POLICY_KINDS.map((kind) => writes.policies.listVersions(kind)));
+        const accepted = new Set((await scope.reads.policies.listAcceptances(scope.memberId)).map((acceptance) => acceptance.policyVersionId));
+        const pending = lists
+          .map((versions) => latestPublished(versions, nowMs))
+          .filter((version): version is PolicyVersion => version !== null && !accepted.has(version.id));
+        return ok(pending);
+      });
+    },
+
+    publish(ctx, input) {
+      return kit.guard<PolicyVersion>(ctx, async () => {
+        const scope = await kit.memberScope(ctx, "admin.policies.manage");
+        if (!scope.ok) {
+          return scope;
+        }
+        const parsed = policyPublishInputSchema.safeParse(input);
+        if (!parsed.success) {
+          return fail("VALIDATION_FAILED", ctx.requestId, fieldsFromZod(parsed.error));
+        }
+        // Legal text that binds members is high impact, so the password is confirmed again.
+        const reauthError = await kit.requireReauth(ctx, "admin.policies.manage");
+        if (reauthError !== null) {
+          return { ok: false, error: reauthError };
+        }
+        const { kind, version, body, draft } = parsed.data;
+        // ASSUMED rule: only the owner can mark a version as legally reviewed. Everyone else publishes drafts.
+        if (!draft && !scope.roles.includes("owner")) {
+          return fail("PERMISSION_DENIED", ctx.requestId, { draft: "Only the owner can publish a version as legally reviewed." });
+        }
+        const writes = kit.writes();
+        const existing = await writes.policies.listVersions(kind);
+        if (existing.some((candidate) => candidate.version === version)) {
+          return fail("CONFLICT", ctx.requestId, { version: "This version name is already used. Choose a new one." });
+        }
+        const created = await policyRepo(writes).publish({ kind, version, body, draft, publishedBy: scope.memberId });
+        await kit.audit(ctx, { action: "policy.publish", targetType: "policy_version", targetId: created.id, result: "success", detail: { kind, version, draft } });
+        return ok(created);
       });
     },
   };
