@@ -2,7 +2,7 @@
  * Decides what settlement does with a provider verify answer. Pure, no I/O.
  *
  * Invariant A2: credit only when the provider says success AND the reference, currency and amount
- * match the attempt we created. Anything else posts nothing.
+ * match the attempt we created (see amountMatches for the one allowed fee case). Anything else posts nothing.
  * Invariant A3: the input here comes from the verify endpoint, never from a webhook body or a client.
  * Any status we do not recognise is treated as "still in progress", never as success.
  */
@@ -24,8 +24,13 @@ export interface ProviderVerification {
   readonly reference: string;
   /** Raw status text from the provider. Unrecognised values are handled safely. */
   readonly status: string;
+  /** What the customer paid. Equals the requested amount plus fees when fees are passed to the customer. */
   readonly amountKobo: number;
   readonly currency: string;
+  /** The amount we asked for, as the provider recorded it. Paystack returns it as `requested_amount`. */
+  readonly requestedAmountKobo?: number | null;
+  /** Provider fees. Only used to explain a customer paid total above the requested amount. */
+  readonly feesKobo?: number | null;
 }
 
 export type MismatchReason = "reference" | "currency" | "amount";
@@ -41,10 +46,25 @@ export function isProviderTxStatus(value: string): value is ProviderTxStatus {
   return (PROVIDER_TX_STATUSES as readonly string[]).includes(value);
 }
 
+/**
+ * The amount is accepted in exactly two cases, both from provider data:
+ * 1. the paid amount equals what we asked for, or
+ * 2. the provider recorded our amount as the requested amount and the paid amount is that plus its
+ *    own fees, which is what happens when fees are passed to the customer.
+ * A higher total with no matching requested amount and fees is still a mismatch.
+ * The ledger always credits the attempt amount, never the provider total.
+ */
+function amountMatches(expected: ExpectedPayment, actual: ProviderVerification): boolean {
+  if (!isKobo(actual.amountKobo)) return false;
+  if (actual.amountKobo === expected.amountKobo) return true;
+  const { requestedAmountKobo, feesKobo } = actual;
+  if (!isKobo(requestedAmountKobo) || !isKobo(feesKobo)) return false;
+  return requestedAmountKobo === expected.amountKobo && actual.amountKobo === requestedAmountKobo + feesKobo;
+}
+
 function matchMoney(expected: ExpectedPayment, actual: ProviderVerification): MismatchReason | null {
   if (actual.currency.toUpperCase() !== expected.currency) return "currency";
-  if (!isKobo(actual.amountKobo) || actual.amountKobo !== expected.amountKobo) return "amount";
-  return null;
+  return amountMatches(expected, actual) ? null : "amount";
 }
 
 export function evaluateVerification(expected: ExpectedPayment, actual: ProviderVerification): VerificationDecision {

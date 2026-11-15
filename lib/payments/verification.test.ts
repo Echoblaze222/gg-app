@@ -40,6 +40,44 @@ describe("success", () => {
   });
 });
 
+describe("fees passed to the customer", () => {
+  // Shape taken from the Paystack verify sample: amount 40333 = requested_amount 30050 + fees 10283.
+  const withFees = { amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: 10_283 };
+
+  it("settles when the total is exactly the requested amount plus fees", () => {
+    expect(evaluateVerification(expected, provider(withFees))).toEqual({ kind: "settle" });
+  });
+
+  it("is a mismatch when the total does not equal requested plus fees", () => {
+    expect(evaluateVerification(expected, provider({ ...withFees, amountKobo: 260_284 }))).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(evaluateVerification(expected, provider({ ...withFees, amountKobo: 260_282 }))).toEqual({ kind: "mismatch", reason: "amount" });
+  });
+
+  it("is a mismatch when the requested amount is not the one we asked for", () => {
+    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: 249_999, feesKobo: 10_284 }))).toEqual({ kind: "mismatch", reason: "amount" });
+  });
+
+  it("is a mismatch when requested amount or fees are missing, null or invalid", () => {
+    expect(evaluateVerification(expected, provider({ amountKobo: 260_283 }))).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: null }))).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: null, feesKobo: 10_283 }))).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: -10_283 }))).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(evaluateVerification(expected, provider({ amountKobo: 260_283.5, requestedAmountKobo: 250_000, feesKobo: 10_283.5 }))).toEqual({ kind: "mismatch", reason: "amount" });
+  });
+
+  it("an exact match still wins when the provider also reports requested amount and fees", () => {
+    expect(evaluateVerification(expected, provider({ requestedAmountKobo: 250_000, feesKobo: 0 }))).toEqual({ kind: "settle" });
+  });
+
+  it("a different currency is still a mismatch in the fee case", () => {
+    expect(evaluateVerification(expected, provider({ ...withFees, currency: "USD" }))).toEqual({ kind: "mismatch", reason: "currency" });
+  });
+
+  it("reversed uses the same amount rule", () => {
+    expect(evaluateVerification(expected, provider({ ...withFees, status: "reversed" }))).toEqual({ kind: "reversed" });
+  });
+});
+
 describe("reference is checked before status", () => {
   it.each([...PROVIDER_TX_STATUSES, "something_new"])("a %s answer for another reference is never trusted", (status) => {
     expect(evaluateVerification(expected, provider({ status, reference: "other" }))).toEqual({ kind: "mismatch", reason: "reference" });
