@@ -1,5 +1,7 @@
 export { Button } from "./Button";
 export type { ButtonProps, ActionStatus } from "./Button";
+export { LinkButton } from "./LinkButton";
+export type { LinkButtonProps } from "./LinkButton";
 export { Input } from "./Input";
 export type { InputProps } from "./Input";
 export { Card } from "./Card";
