@@ -1,8 +1,9 @@
-import type { RateLimitRule, RateLimiter, PrivacyService } from "../../contracts/services";
+import type { PrivacyRequest } from "../../contracts/entities";
+import { privacyRequestInputSchema } from "../../contracts/schemas";
+import type { PrivacyService, RateLimitRule, RateLimiter } from "../../contracts/services";
 import { fail, ok } from "../notifications/result";
 import { fieldsFromZod } from "../notifications/schemas";
 import { createKit, type KitDeps } from "../support/kit";
-import { privacyCreateInputSchema } from "./schemas";
 
 /** ASSUMED limit. Owner tunable. */
 export const PRIVACY_REQUEST_RATE: RateLimitRule = { name: "privacy_request_create", limit: 3, windowSeconds: 86400 };
@@ -20,12 +21,12 @@ export function createPrivacyService(deps: PrivacyServiceDeps): PrivacyService {
 
   return {
     createRequest(ctx, input) {
-      return kit.guard(ctx, async () => {
+      return kit.guard<PrivacyRequest>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.privacy.request");
         if (!scope.ok) {
           return scope;
         }
-        const parsed = privacyCreateInputSchema.safeParse(input);
+        const parsed = privacyRequestInputSchema.safeParse(input);
         if (!parsed.success) {
           return fail("VALIDATION_FAILED", ctx.requestId, fieldsFromZod(parsed.error));
         }
@@ -59,7 +60,7 @@ export function createPrivacyService(deps: PrivacyServiceDeps): PrivacyService {
     },
 
     listMine(ctx) {
-      return kit.guard(ctx, async () => {
+      return kit.guard<PrivacyRequest[]>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.privacy.request");
         if (!scope.ok) {
           return scope;

@@ -1,6 +1,6 @@
-import type { PolicyVersion } from "../../contracts/entities";
+import type { PolicyAcceptance, PolicyVersion } from "../../contracts/entities";
 import { POLICY_KINDS } from "../../contracts/enums";
-import { AppError, type Result } from "../../contracts/errors";
+import { AppError } from "../../contracts/errors";
 import { policyKindSchema } from "../../contracts/schemas";
 import type { PolicyService } from "../../contracts/services";
 import { fail, failFrom, ok } from "../notifications/result";
@@ -63,7 +63,7 @@ export function createPolicyService(deps: PolicyServiceDeps): PolicyService {
     },
 
     accept(ctx, input) {
-      return kit.guard(ctx, async () => {
+      return kit.guard<PolicyAcceptance>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.profile.update");
         if (!scope.ok) {
           return scope;
@@ -103,14 +103,20 @@ export function createPolicyService(deps: PolicyServiceDeps): PolicyService {
 
         // Written with the server repository so the ip comes from the server and cannot be supplied by the member.
         const acceptance = await writes.policies.accept({ memberId: scope.memberId, policyVersionId: wantedId, ip: ctx.ip });
-        await kit.audit(ctx, { action: "policy.accept", targetType: "policy_version", targetId: wantedId, result: "success", detail: { kind: target.version.kind, version: target.version.version, draft: target.version.draft } });
+        await kit.audit(ctx, {
+          action: "policy.accept",
+          targetType: "policy_version",
+          targetId: wantedId,
+          result: "success",
+          detail: { kind: target.version.kind, version: target.version.version, draft: target.version.draft },
+        });
         await kit.publish(ctx, "policy.accepted", { memberId: scope.memberId, policyVersionId: wantedId });
         return ok(acceptance);
       });
     },
 
     listAcceptances(ctx) {
-      return kit.guard(ctx, async (): Promise<Result<Awaited<ReturnType<PolicyService["listAcceptances"]>> extends Result<infer T> ? T : never>> => {
+      return kit.guard<PolicyAcceptance[]>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.profile.read");
         if (!scope.ok) {
           return scope;

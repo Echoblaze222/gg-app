@@ -1,4 +1,4 @@
-import type { SupportTicket, Uuid } from "../../contracts/entities";
+import type { Page, SupportMessage, SupportTicket, Uuid } from "../../contracts/entities";
 import type { Repositories } from "../../contracts/repositories";
 import { pageRequestSchema } from "../../contracts/schemas";
 import type { RateLimitRule, RateLimiter, SupportService } from "../../contracts/services";
@@ -22,7 +22,7 @@ export interface SupportServiceDeps extends KitDeps {
 async function findOwnTicket(reads: Repositories, memberId: Uuid, ticketId: Uuid): Promise<SupportTicket | null> {
   let cursor: string | null = null;
   for (let pageNumber = 0; pageNumber < TICKET_SCAN_MAX_PAGES; pageNumber += 1) {
-    const page = await reads.support.listByMember(memberId, { limit: TICKET_SCAN_PAGE_SIZE, cursor });
+    const page: Page<SupportTicket> = await reads.support.listByMember(memberId, { limit: TICKET_SCAN_PAGE_SIZE, cursor });
     const hit = page.items.find((ticket) => ticket.id === ticketId);
     if (hit) {
       return hit;
@@ -41,7 +41,7 @@ export function createSupportService(deps: SupportServiceDeps): SupportService {
 
   return {
     createTicket(ctx, input) {
-      return kit.guard(ctx, async () => {
+      return kit.guard<SupportTicket>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.support.create");
         if (!scope.ok) {
           return scope;
@@ -65,7 +65,7 @@ export function createSupportService(deps: SupportServiceDeps): SupportService {
     },
 
     reply(ctx, input) {
-      return kit.guard(ctx, async () => {
+      return kit.guard<SupportMessage>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.support.create");
         if (!scope.ok) {
           return scope;
@@ -112,7 +112,7 @@ export function createSupportService(deps: SupportServiceDeps): SupportService {
     },
 
     listMine(ctx, page) {
-      return kit.guard(ctx, async () => {
+      return kit.guard<Page<SupportTicket>>(ctx, async () => {
         const scope = await kit.memberScope(ctx, "member.support.create");
         if (!scope.ok) {
           return scope;
