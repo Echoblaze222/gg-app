@@ -92,7 +92,7 @@ describe("interface component contrast is at least 3 to 1", () => {
     expect(block).not.toBeNull();
     const ring = block![1].match(/--color-focus-ring\s*:\s*(#[0-9a-f]{6})/i);
     expect(ring).not.toBeNull();
-    expect(ratio(ring![1], color("ink"))).toBeGreaterThanOrEqual(4.5 - 1.5);
+    expect(ratio(ring![1], color("ink"))).toBeGreaterThanOrEqual(3);
   });
 });
 
