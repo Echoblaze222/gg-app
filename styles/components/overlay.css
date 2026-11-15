@@ -1,0 +1,158 @@
+/*
+ * Modal and sheet. States: idle, hover, pressed, focus, disabled (close button while busy), loading (busy), success and failure (content inside).
+ * Reduced motion: panels appear without sliding or scaling.
+ */
+@layer components {
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+  }
+  .overlay--modal {
+    place-items: center;
+    padding: var(--space-4);
+  }
+  .overlay--sheet {
+    align-items: end;
+  }
+  .overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background-color: rgb(17 17 17 / 0.48);
+    animation: overlay-fade var(--motion-base) var(--ease-standard);
+  }
+  .overlay__panel {
+    position: relative;
+    display: grid;
+    gap: var(--space-4);
+    width: 100%;
+    max-height: calc(100dvh - var(--space-8));
+    overflow-y: auto;
+    padding: var(--space-6);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-lg);
+  }
+  .overlay__panel:focus {
+    outline: none;
+  }
+  .overlay--modal .overlay__panel {
+    max-width: 28rem;
+    border-radius: var(--radius-xl);
+    animation: overlay-pop var(--motion-base) var(--ease-enter);
+  }
+  .overlay--sheet .overlay__panel {
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+    animation: overlay-rise var(--motion-slow) var(--ease-enter);
+  }
+  .overlay__grabber {
+    justify-self: center;
+    width: 40px;
+    height: 4px;
+    margin-top: calc(var(--space-2) * -1);
+    border-radius: var(--radius-pill);
+    background-color: var(--color-border);
+  }
+  .overlay__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+  .overlay__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-regular);
+    line-height: var(--leading-tight);
+  }
+  .overlay__description {
+    margin: 0;
+    color: var(--color-ink-muted);
+    line-height: var(--leading-normal);
+  }
+  .overlay__footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .overlay__close {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: var(--target-min);
+    height: var(--target-min);
+    margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background-color: transparent;
+    color: var(--color-ink);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      transform var(--motion-instant) var(--ease-standard);
+  }
+  @media (hover: hover) {
+    .overlay__close:hover:not(:disabled) {
+      background-color: color-mix(in srgb, var(--color-ink) 6%, transparent);
+    }
+  }
+  .overlay__close:active:not(:disabled) {
+    background-color: color-mix(in srgb, var(--color-ink) 12%, transparent);
+    transform: scale(0.96);
+  }
+  .overlay__close:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+  .overlay__close:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .overlay__panel[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  /* Wide screens: a sheet with side="end" becomes a right hand panel. */
+  @media (min-width: 768px) {
+    .overlay--end {
+      justify-items: end;
+      align-items: stretch;
+    }
+    .overlay--end .overlay__panel {
+      max-width: 26rem;
+      max-height: 100dvh;
+      height: 100%;
+      align-content: start;
+      border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+      padding-bottom: var(--space-6);
+      animation: overlay-slide var(--motion-slow) var(--ease-enter);
+    }
+    .overlay--end .overlay__grabber {
+      display: none;
+    }
+  }
+
+  @keyframes overlay-fade {
+    from { opacity: 0; }
+  }
+  @keyframes overlay-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  }
+  @keyframes overlay-rise {
+    from { transform: translateY(100%); }
+  }
+  @keyframes overlay-slide {
+    from { transform: translateX(100%); }
+  }
+
+  .overlay[data-motion="reduced"] .overlay__backdrop,
+  .overlay[data-motion="reduced"] .overlay__panel {
+    animation: none;
+  }
+}

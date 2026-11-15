@@ -1,0 +1,55 @@
+/* Empty, error and success states. Icon shape differs per tone, color only supports it. */
+@layer components {
+  .state {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    padding: var(--space-12) var(--space-6);
+    text-align: center;
+  }
+  .state--compact {
+    padding: var(--space-8) var(--space-4);
+  }
+  .state__badge {
+    display: inline-grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-pill);
+    background-color: color-mix(in srgb, var(--color-ink) 6%, var(--color-surface));
+    color: var(--color-ink);
+  }
+  .state--error .state__badge {
+    background-color: var(--color-error-surface);
+    color: var(--color-error);
+  }
+  .state--success .state__badge {
+    background-color: var(--color-success-surface);
+    color: var(--color-success);
+  }
+  .state__icon {
+    width: 28px;
+    height: 28px;
+  }
+  .state__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-regular);
+    line-height: var(--leading-tight);
+  }
+  .state__text {
+    margin: 0;
+    max-width: 34ch;
+    color: var(--color-ink-muted);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+  }
+  .state__action {
+    margin-top: var(--space-3);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+  }
+}

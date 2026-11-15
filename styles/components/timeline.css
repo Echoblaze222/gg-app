@@ -1,0 +1,132 @@
+/*
+ * Timeline pills for the contribution schedule. Vertical list on phones, a row with connectors from 768 px.
+ * Status is icon plus word. Current (next due) is the black pill.
+ * States: idle, hover, pressed, focus, disabled (only when interactive).
+ */
+@layer components {
+  .timeline {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pill {
+    --pill-bg: var(--color-surface);
+    --pill-fg: var(--color-ink);
+    --pill-accent: var(--color-ink-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: var(--target-min);
+    padding: var(--space-3) var(--space-5);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 14%, transparent);
+    border-radius: var(--radius-pill);
+    background-color: var(--pill-bg);
+    color: var(--pill-fg);
+    font: inherit;
+    text-align: start;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pill__icon {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    color: var(--pill-accent);
+  }
+  .pill__text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .pill__date {
+    font-weight: var(--weight-semibold);
+  }
+  .pill__label,
+  .pill__status {
+    font-size: var(--text-sm);
+    color: var(--color-ink-muted);
+  }
+  .pill__status {
+    font-weight: var(--weight-medium);
+  }
+
+  .pill[data-status="paid"] {
+    --pill-bg: var(--color-success-surface);
+    --pill-accent: var(--color-success);
+  }
+  .pill[data-status="pending"] {
+    --pill-bg: var(--color-pending-surface);
+    --pill-accent: var(--color-pending);
+  }
+  .pill[data-status="overdue"] {
+    --pill-bg: var(--color-error-surface);
+    --pill-accent: var(--color-error);
+  }
+  .pill[data-current="true"] {
+    --pill-bg: var(--color-ink);
+    --pill-fg: var(--color-ink-inverse);
+    --pill-accent: var(--color-ink-inverse);
+    border-color: var(--color-ink);
+  }
+  .pill[data-current="true"] .pill__label,
+  .pill[data-current="true"] .pill__status {
+    color: color-mix(in srgb, var(--color-ink-inverse) 82%, transparent);
+  }
+
+  /* Interactive pills only */
+  button.pill {
+    cursor: pointer;
+    transition:
+      filter var(--motion-fast) var(--ease-standard),
+      transform var(--motion-instant) var(--ease-standard);
+  }
+  @media (hover: hover) {
+    button.pill:hover {
+      filter: brightness(0.96);
+    }
+    button.pill[data-current="true"]:hover {
+      filter: brightness(1.18);
+    }
+  }
+  button.pill[data-preview~="hover"] {
+    filter: brightness(0.96);
+  }
+  button.pill:active,
+  button.pill[data-preview~="pressed"] {
+    transform: scale(0.98);
+    filter: brightness(0.92);
+  }
+  button.pill:focus-visible,
+  button.pill[data-preview~="focus"] {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 3px;
+  }
+  .pill[aria-disabled="true"] {
+    opacity: 0.5;
+  }
+
+  @media (min-width: 768px) {
+    .timeline {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(10rem, 1fr);
+      gap: 0;
+      overflow-x: auto;
+      padding-block: var(--space-1);
+    }
+    .timeline__item {
+      position: relative;
+      padding-inline-end: var(--space-4);
+    }
+    .timeline__item:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      inset-inline-end: 0;
+      width: var(--space-4);
+      height: 2px;
+      background-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
+    }
+  }
+}
