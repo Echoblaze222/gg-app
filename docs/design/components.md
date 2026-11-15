@@ -4,7 +4,7 @@ Read this before building any screen. Import from `@/components/ui` and `@/lib/m
 
 Gallery: `/design-gallery` (development only, ADR-008). It shows every state of every component below.
 
-Updated: 2026-11-15, cover milestone 1 (LinkButton and brand symbol and wordmark added).
+Updated: 2026-11-15, cover milestone 2 (logo kit added).
 
 ## Ready
 
@@ -81,7 +81,7 @@ import { BrandSymbol, Wordmark } from "@/components/brand";
 <Wordmark layout="name" />      // name only
 <BrandSymbol tone="inverse" />  // on black. tones: ink, inverse, mono
 ```
-The symbol is two overlapping rings with the accent in the overlap. The complete logo kit (app icon, files in `public/brand/`, clear space rules) is still being built.
+The symbol is two overlapping rings with the accent in the overlap. Files for light, dark and monochrome, the app icons, clear space and minimum size rules are in `docs/design/brand.md` and `public/brand/`.
 
 ### Motion primitives (`@/lib/motion`, `@/components/motion`)
 - `useReducedMotion()`: true when the system asks for less motion.
@@ -95,4 +95,4 @@ Names are frozen in `contracts/design-tokens.md`. In Tailwind: `bg-canvas`, `bg-
 Rules: one accent hue; status is never color alone (icon and text too); card hairlines use `border-ink/10`, controls use `border-border`.
 
 ## Next (in this order)
-Empty, error and success screens, sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens, marketing site.
+Empty, error and success screens, sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens.

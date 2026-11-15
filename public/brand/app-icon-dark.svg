@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="GG Contribution app icon, dark">
+  <defs><clipPath id="a"><circle cx="18.5" cy="16" r="11"/></clipPath></defs>
+  <rect width="512" height="512" rx="112" fill="#111111"/>
+  <g transform="translate(76 136) scale(7.5)">
+    <circle cx="29.5" cy="16" r="11" fill="#c4b0ff" clip-path="url(#a)"/>
+    <circle cx="18.5" cy="16" r="11" fill="none" stroke="#ffffff" stroke-width="3.5"/>
+    <circle cx="29.5" cy="16" r="11" fill="none" stroke="#ffffff" stroke-width="3.5"/>
+  </g>
+</svg>

@@ -27,12 +27,12 @@ export function BrandSymbol({ tone = "ink", title, className, ...rest }: BrandSy
     >
       <defs>
         <clipPath id={clipId}>
-          <circle cx="17" cy="16" r="11" />
+          <circle cx="18.5" cy="16" r="11" />
         </clipPath>
       </defs>
-      <circle cx="31" cy="16" r="11" fill={lens} clipPath={`url(#${clipId})`} />
-      <circle cx="17" cy="16" r="11" fill="none" stroke={stroke} strokeWidth="3.5" />
-      <circle cx="31" cy="16" r="11" fill="none" stroke={stroke} strokeWidth="3.5" />
+      <circle cx="29.5" cy="16" r="11" fill={lens} clipPath={`url(#${clipId})`} />
+      <circle cx="18.5" cy="16" r="11" fill="none" stroke={stroke} strokeWidth="3.5" />
+      <circle cx="29.5" cy="16" r="11" fill="none" stroke={stroke} strokeWidth="3.5" />
     </svg>
   );
 }
