@@ -89,4 +89,17 @@ describe("rate limiter", () => {
     const r = await limiter.check(makeCtx({ requestId: "req_rl" }), rule);
     expect(!r.ok && r.error.reference).toBe("req_rl");
   });
+  it("R12 a tighter account limit applies without tightening the address limit", async () => {
+    const { limiter } = build();
+    const r2 = { name: "login2", limit: 50, windowSeconds: 60, accountLimit: 2 };
+    expect(code(await limiter.check(makeCtx({ ip: "203.0.113.1" }), r2, { memberId: A }))).toBe("OK");
+    expect(code(await limiter.check(makeCtx({ ip: "203.0.113.2" }), r2, { memberId: A }))).toBe("OK");
+    expect(code(await limiter.check(makeCtx({ ip: "203.0.113.3" }), r2, { memberId: A }))).toBe("RATE_LIMITED");
+    // many different accounts from one shared address are still fine under the loose address limit
+    for (let i = 0; i < 10; i++) expect(code(await limiter.check(makeCtx({ ip: "198.51.100.5" }), r2, { memberId: `00000000-0000-4000-8000-0000000000${10 + i}` }))).toBe("OK");
+  });
+  it("R13 rejects an invalid account limit", async () => {
+    const { limiter } = build();
+    expect(code(await limiter.check(makeCtx(), { name: "x", limit: 5, windowSeconds: 60, accountLimit: 0 } as never))).toBe("INTERNAL");
+  });
 });
