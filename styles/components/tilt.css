@@ -1,0 +1,80 @@
+@layer components {
+  /* 3D stage for the landing page. Decoration only. */
+  .tilt {
+    perspective: 1100px;
+    perspective-origin: 50% 40%;
+  }
+  .tilt__scene {
+    position: relative;
+    transform-style: preserve-3d;
+    transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    will-change: transform;
+  }
+
+  /* A layer at its own depth. Set --z inline, for example style={{ "--z": "80px" }}. */
+  .depth {
+    transform: translate3d(0, 0, var(--z, 0px));
+  }
+
+  /* Slow float. Each variant uses a different length so the layers never move in step. */
+  .float-a {
+    animation: tilt-float-a 7s ease-in-out infinite;
+  }
+  .float-b {
+    animation: tilt-float-b 9s ease-in-out infinite;
+  }
+  .float-c {
+    animation: tilt-float-c 8s ease-in-out infinite;
+  }
+  @keyframes tilt-float-a {
+    0%, 100% { transform: translate3d(0, 0, var(--z, 0px)) rotate(-1deg); }
+    50% { transform: translate3d(0, -12px, var(--z, 0px)) rotate(1deg); }
+  }
+  @keyframes tilt-float-b {
+    0%, 100% { transform: translate3d(0, -6px, var(--z, 0px)) rotate(1deg); }
+    50% { transform: translate3d(0, 8px, var(--z, 0px)) rotate(-1deg); }
+  }
+  @keyframes tilt-float-c {
+    0%, 100% { transform: translate3d(0, 4px, var(--z, 0px)); }
+    50% { transform: translate3d(0, -10px, var(--z, 0px)); }
+  }
+
+  /* The illustration breathes a little behind the floating cards. */
+  .hero-art {
+    animation: hero-art-breathe 10s ease-in-out infinite;
+  }
+  @keyframes hero-art-breathe {
+    0%, 100% { transform: translate3d(0, 0, var(--z, 0px)) scale(1); }
+    50% { transform: translate3d(0, -6px, var(--z, 0px)) scale(1.015); }
+  }
+
+  /* Rotating text badge. */
+  .badge-spin {
+    animation: badge-spin 28s linear infinite;
+  }
+  @keyframes badge-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Floating cards: flat white, hairline border, a deeper shadow than normal cards to read as closer to the viewer. */
+  .float-card {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tilt__scene {
+      transform: none;
+    }
+    .float-a,
+    .float-b,
+    .float-c,
+    .hero-art,
+    .badge-spin {
+      animation: none;
+    }
+  }
+}

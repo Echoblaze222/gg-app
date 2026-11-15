@@ -12,6 +12,7 @@
 @import "./components/timeline.css";
 @import "./components/progress-ring.css";
 @import "./components/data-table.css";
+@import "./components/tilt.css";
 
 @layer base {
   html {
