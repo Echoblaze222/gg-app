@@ -1,5 +1,5 @@
 import type { Page, SupportMessage, SupportTicket, Uuid } from "../../contracts/entities";
-import { PRIVILEGED_ROLES, type Role } from "../../contracts/enums";
+import { PRIVILEGED_ROLES, type Role, type SupportTicketStatus } from "../../contracts/enums";
 import type { AppErrorShape } from "../../contracts/errors";
 import type { Repositories } from "../../contracts/repositories";
 import { pageRequestSchema } from "../../contracts/schemas";
@@ -168,7 +168,7 @@ export function createSupportService(deps: SupportServiceDeps): SupportServiceV1
 
         // A reply hands the ticket back to staff. Not atomic with the message (no single repository method yet):
         // if this step fails the message is still delivered and the failure is reported for follow up.
-        let status = ticket.status;
+        let status: SupportTicketStatus = ticket.status;
         if (ticket.status === "pending_member" || ticket.status === "resolved") {
           try {
             status = (await writes.support.setStatus(ticket.id, "pending_staff")).status;
@@ -291,7 +291,7 @@ export function createSupportService(deps: SupportServiceDeps): SupportServiceV1
         const message = await repo.addMessage({ ticketId: ticket.id, authorId: auth.value.memberId, fromStaff: true, body: parsed.data.body });
 
         // Same non atomic caveat as the member reply: the message stands even if the status step fails.
-        let status = ticket.status;
+        let status: SupportTicketStatus = ticket.status;
         try {
           status = (await repo.setStatus(ticket.id, "pending_member")).status;
         } catch (error) {
