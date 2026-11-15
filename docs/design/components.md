@@ -4,7 +4,7 @@ Read this before building any screen. Import from `@/components/ui` and `@/lib/m
 
 Gallery: `/design-gallery` (development only, ADR-008). It shows every state of every component below.
 
-Updated: 2026-11-14, milestone M2 (Input and Card added).
+Updated: 2026-11-15, cover milestone 1 (LinkButton and brand symbol and wordmark added).
 
 ## Ready
 
@@ -39,6 +39,50 @@ Props: `label` (required, real label that floats), `hint`, `error` (what is wron
 ```
 `as` can be `div`, `section` or `article`.
 
+### Alert (`components/ui/Alert.tsx`)
+```tsx
+<Alert tone="error" title="Payment failed" onDismiss={() => setShown(false)}>No money left your account. Check your card details and try again.</Alert>
+```
+Tones: `info`, `success`, `pending`, `warning`, `error`. Each has its own icon. `error` is announced immediately, the others politely. Say what happened, what to do, and whether money moved.
+
+### Skeleton (`components/ui/Skeleton.tsx`)
+```tsx
+<SkeletonGroup label="Loading your balance">
+  <Skeleton shape="circle" />
+  <Skeleton width="60%" />
+  <Skeleton shape="block" />
+</SkeletonGroup>
+```
+The group shows its placeholders only after 300 ms and announces its label once. Replace it with real content when data arrives. Pulses, and is static with reduced motion.
+
+### Toast (`components/ui/Toast.tsx`)
+```tsx
+// once, in the app shell layout (not done yet, owner of the shell adds it):
+<ToastProvider>{children}</ToastProvider>
+
+// anywhere in a client component:
+const toast = useToast();
+toast.show({ tone: "success", title: "Contribution received", message: "NGN 5,000 added." });
+toast.show({ tone: "error", title: "Payment failed", message: "No money left your account." }); // stays until dismissed
+```
+5 s default, hover or focus pauses it, errors never auto close, at most 3 visible. If the app has a bottom tab bar set `--toast-offset-bottom` on `:root` to its height so toasts sit above it. Swipe to dismiss comes later with the gesture work.
+
+### LinkButton (`components/ui/LinkButton.tsx`)
+```tsx
+<LinkButton href="/register" size="lg" variant="primary">Get started</LinkButton>
+```
+A navigation link drawn as a pill, same variants and sizes as Button. Use it to go to a page. Use Button for anything that changes data, because only Button has loading, success and failure states.
+
+### Brand (`components/brand/`)
+```tsx
+import { BrandSymbol, Wordmark } from "@/components/brand";
+
+<Wordmark />                    // symbol plus name
+<Wordmark layout="name" />      // name only
+<BrandSymbol tone="inverse" />  // on black. tones: ink, inverse, mono
+```
+The symbol is two overlapping rings with the accent in the overlap. The complete logo kit (app icon, files in `public/brand/`, clear space rules) is still being built.
+
 ### Motion primitives (`@/lib/motion`, `@/components/motion`)
 - `useReducedMotion()`: true when the system asks for less motion.
 - `useDelayedFlag(active, delayMs = 300)`: true only after `active` stayed true for the delay. Use it for any loader.
@@ -51,4 +95,4 @@ Names are frozen in `contracts/design-tokens.md`. In Tailwind: `bg-canvas`, `bg-
 Rules: one accent hue; status is never color alone (icon and text too); card hairlines use `border-ink/10`, controls use `border-border`.
 
 ## Next (in this order)
-Feedback (alert, toast, skeleton, empty, error, success), sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens, marketing site.
+Empty, error and success screens, sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens, marketing site.
