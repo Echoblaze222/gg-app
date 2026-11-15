@@ -2,6 +2,10 @@ import { z } from "zod";
 import { NOTIFICATION_TYPES } from "../../contracts/enums";
 import { uuidSchema } from "../../contracts/schemas";
 
+/** NUL characters cannot be stored in text columns and would turn a bad value into a server error. */
+const noNul = (value: string) => !value.includes("\u0000");
+const NO_NUL_MESSAGE = "This text contains a character that is not allowed.";
+
 /**
  * Deep links stay inside the member app. No scheme, no host, no protocol relative links and no dot segments,
  * so a notification can never send a member to another site or to an admin page.
@@ -15,8 +19,8 @@ export const deepLinkSchema = z
 export const notifyInputSchema = z.object({
   memberId: uuidSchema,
   type: z.enum(NOTIFICATION_TYPES),
-  title: z.string().trim().min(1).max(120),
-  body: z.string().trim().min(1).max(1000),
+  title: z.string().trim().min(1).max(120).refine(noNul, NO_NUL_MESSAGE),
+  body: z.string().trim().min(1).max(1000).refine(noNul, NO_NUL_MESSAGE),
   link: deepLinkSchema.optional(),
 });
 
