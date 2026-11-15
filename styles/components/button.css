@@ -1,0 +1,151 @@
+/*
+ * Button. States: idle, hover, pressed, focus, disabled, loading, success, failure.
+ * The data-preview attribute lets the gallery show hover, pressed and focus without a pointer. Production code never sets it.
+ */
+@layer components {
+  .btn {
+    --btn-bg: var(--color-ink);
+    --btn-fg: var(--color-ink-inverse);
+    --btn-border: transparent;
+    --btn-bg-hover: color-mix(in srgb, var(--color-ink) 86%, white);
+    --btn-bg-pressed: color-mix(in srgb, var(--color-ink) 100%, black);
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: var(--target-min);
+    padding-inline: var(--space-6);
+    border: 1px solid var(--btn-border);
+    border-radius: var(--radius-pill);
+    background-color: var(--btn-bg);
+    color: var(--btn-fg);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      transform var(--motion-instant) var(--ease-standard),
+      opacity var(--motion-fast) var(--ease-standard);
+  }
+
+  .btn--lg {
+    min-height: 56px;
+    padding-inline: var(--space-8);
+    font-size: var(--text-lg);
+  }
+
+  .btn--secondary {
+    --btn-bg: var(--color-surface);
+    --btn-fg: var(--color-ink);
+    --btn-border: var(--color-border);
+    --btn-bg-hover: color-mix(in srgb, var(--color-ink) 5%, var(--color-surface));
+    --btn-bg-pressed: color-mix(in srgb, var(--color-ink) 10%, var(--color-surface));
+  }
+
+  .btn--accent {
+    --btn-bg: var(--color-accent);
+    --btn-fg: var(--color-accent-ink);
+    --btn-bg-hover: color-mix(in srgb, var(--color-accent) 90%, white);
+    --btn-bg-pressed: color-mix(in srgb, var(--color-accent) 85%, black);
+  }
+
+  .btn--quiet {
+    --btn-bg: transparent;
+    --btn-fg: var(--color-ink);
+    --btn-bg-hover: color-mix(in srgb, var(--color-ink) 6%, transparent);
+    --btn-bg-pressed: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  }
+
+  /* Hover (pointer devices only) */
+  @media (hover: hover) {
+    .btn:hover:not(:disabled, [aria-disabled="true"]) {
+      background-color: var(--btn-bg-hover);
+    }
+  }
+  .btn[data-preview~="hover"] {
+    background-color: var(--btn-bg-hover);
+  }
+
+  /* Pressed */
+  .btn:active:not(:disabled, [aria-disabled="true"]),
+  .btn[data-preview~="pressed"] {
+    background-color: var(--btn-bg-pressed);
+    transform: scale(0.98);
+  }
+
+  /* Focus, visible for keyboard users */
+  .btn:focus-visible,
+  .btn[data-preview~="focus"] {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 3px;
+  }
+
+  /* Disabled */
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Loading and success keep the button locked but readable. */
+  .btn[aria-disabled="true"] {
+    cursor: default;
+  }
+  .btn[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  /* Success and failure are calm color changes plus an icon. Text always says what happened. */
+  .btn[data-status="success"] {
+    --btn-bg: var(--color-success);
+    --btn-fg: var(--color-ink-inverse);
+    background-color: var(--color-success);
+  }
+  .btn[data-status="failure"] {
+    --btn-bg: var(--color-error);
+    --btn-fg: var(--color-ink-inverse);
+    --btn-bg-hover: color-mix(in srgb, var(--color-error) 90%, white);
+    --btn-bg-pressed: color-mix(in srgb, var(--color-error) 85%, black);
+    background-color: var(--color-error);
+  }
+
+  .btn__icon {
+    display: inline-flex;
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
+  }
+
+  /* Loader ring. Appears after the delay. With reduced motion it is a static partial ring. */
+  .btn__spinner {
+    flex: none;
+    width: 1.1em;
+    height: 1.1em;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 800ms linear infinite;
+  }
+  .btn[data-motion="reduced"] .btn__spinner {
+    animation: none;
+  }
+
+  @keyframes btn-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn:active:not(:disabled, [aria-disabled="true"]),
+    .btn[data-preview~="pressed"] {
+      transform: none;
+    }
+  }
+}

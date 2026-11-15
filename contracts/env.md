@@ -16,6 +16,7 @@ Validated at boot by `lib/env.ts` (AI-1). The app refuses to start with a clear 
 | `CRON_SECRET` | server only | jobs | Authenticates scheduled job endpoints |
 | `LOG_LEVEL` | server | no | `debug`, `info`, `warn`, `error`. Default `info` |
 | `OTP_PEPPER` | server only | yes | Secret mixed into hashed OTPs and tokens |
+| `RATE_LIMIT_HMAC_SECRET` | server only | yes | Secret for hashing rate limit keys (emails, IPs). At least 32 random bytes. Never reused for another purpose (added in contract v1.1.0) |
 | `EMAIL_PROVIDER_API_KEY` | server only | pending | Provider not chosen yet. Owner decision |
 | `SMS_PROVIDER_API_KEY` | server only | pending | Provider not chosen yet. Owner decision |
 
