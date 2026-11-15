@@ -4,6 +4,11 @@ import type { RateLimitRepository } from "@/contracts/repositories";
 import type { RateLimiter, RateLimitRule, RequestContext, SecurityEventService } from "@/contracts/services";
 import type { SecurityLogger } from "./types";
 
+/** Contract rule plus an optional tighter limit for the account scope. Address limits stay loose for shared mobile networks. */
+export interface ExtendedRateLimitRule extends RateLimitRule {
+  accountLimit?: number;
+}
+
 export interface RateLimiterDeps {
   limits: RateLimitRepository;
   events: SecurityEventService;
@@ -18,8 +23,9 @@ function fail<T>(code: ErrorCode, ctx: RequestContext): Result<T> {
   return { ok: false, error: new AppError(code, { reference: ctx.requestId }).toShape() };
 }
 
-function validRule(rule: RateLimitRule): boolean {
-  return rule.name.length > 0 && Number.isInteger(rule.limit) && rule.limit >= 1 && Number.isInteger(rule.windowSeconds) && rule.windowSeconds >= 1;
+function validRule(rule: ExtendedRateLimitRule): boolean {
+  const accountOk = rule.accountLimit === undefined || (Number.isInteger(rule.accountLimit) && rule.accountLimit >= 1);
+  return rule.name.length > 0 && Number.isInteger(rule.limit) && rule.limit >= 1 && Number.isInteger(rule.windowSeconds) && rule.windowSeconds >= 1 && accountOk;
 }
 
 export function createRateLimiter(deps: RateLimiterDeps): RateLimiter {
@@ -36,10 +42,10 @@ export function createRateLimiter(deps: RateLimiterDeps): RateLimiter {
         return fail("INTERNAL", ctx);
       }
 
-      const scopes: { scope: "ip" | "account"; key: string }[] = [
-        { scope: "ip", key: `${rule.name}:ip:${digest((ctx.ip ?? "unknown").trim().toLowerCase())}` },
+      const scopes: { scope: "ip" | "account"; key: string; limit: number }[] = [
+        { scope: "ip", limit: rule.limit, key: `${rule.name}:ip:${digest((ctx.ip ?? "unknown").trim().toLowerCase())}` },
       ];
-      if (opts?.memberId) scopes.push({ scope: "account", key: `${rule.name}:acct:${digest(opts.memberId)}` });
+      if (opts?.memberId) scopes.push({ scope: "account", limit: (rule as ExtendedRateLimitRule).accountLimit ?? rule.limit, key: `${rule.name}:acct:${digest(opts.memberId)}` });
 
       let counts: number[];
       try {
@@ -51,12 +57,12 @@ export function createRateLimiter(deps: RateLimiterDeps): RateLimiter {
         return fail("SYSTEM_UNAVAILABLE", ctx);
       }
 
-      const highest = Math.max(...counts);
-      if (highest <= rule.limit) return { ok: true, value: { remaining: rule.limit - highest } };
+      const blocked = scopes.some((s, i) => counts[i] > s.limit);
+      if (!blocked) return { ok: true, value: { remaining: Math.min(...scopes.map((s, i) => s.limit - counts[i])) } };
 
       // One event per scope per window (the first blocked hit), so an attack cannot flood the event table.
       for (let i = 0; i < scopes.length; i++) {
-        if (counts[i] === rule.limit + 1) {
+        if (counts[i] === scopes[i].limit + 1) {
           try {
             await deps.events.record(ctx, { type: "rate_limited", severity: "low", memberId: opts?.memberId ?? null, detail: { rule: rule.name, scope: scopes[i].scope } });
           } catch (err) {

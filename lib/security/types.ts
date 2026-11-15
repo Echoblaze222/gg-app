@@ -4,6 +4,8 @@ import type { Uuid } from "@/contracts/entities";
 /** Facts about the current session, already verified by the auth module (token signature, device not revoked). */
 export interface SessionFacts {
   memberId: Uuid;
+  /** The token's session id. Lets device lists mark the current device. */
+  sessionId?: string;
   /** True only when this session completed a second factor (assurance level aal2). */
   mfaVerified: boolean;
   /** True when the password was confirmed again recently. */
