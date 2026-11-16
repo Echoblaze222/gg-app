@@ -24,19 +24,19 @@ function request(kind: PrivacyRequestKind, status: PrivacyRequestStatus = "recei
 
 const zeroBalance: Balance = { memberId: MEMBER_A, currency: "NGN", ledgerKobo: 0, availableKobo: 0, heldKobo: 0 };
 
-function harness(
-  opts: {
-    stored?: PrivacyRequest;
-    balance?: Partial<Balance>;
-    payoutStatuses?: string[];
-    payoutAlwaysMore?: boolean;
-    openRefund?: boolean;
-    executor?: boolean;
-    reauth?: Result<SessionInfo>;
-    grants?: Partial<Record<PermissionName, Result<SessionInfo>>>;
-    v11?: boolean;
-  } = {},
-) {
+interface HarnessOptions {
+  stored?: PrivacyRequest;
+  balance?: Partial<Balance>;
+  payoutStatuses?: readonly string[];
+  payoutAlwaysMore?: boolean;
+  openRefund?: boolean;
+  executor?: boolean;
+  reauth?: Result<SessionInfo>;
+  grants?: Partial<Record<PermissionName, Result<SessionInfo>>>;
+  v11?: boolean;
+}
+
+function harness(opts: HarnessOptions = {}) {
   const calls: string[] = [];
   const store = new Map<string, PrivacyRequest>();
   if (opts.stored) {
@@ -63,7 +63,7 @@ function harness(
   const ledger = { getBalance: vi.fn(async (): Promise<Balance> => ({ ...zeroBalance, ...opts.balance })) };
   const payouts = {
     listByMember: vi.fn(async () => ({
-      items: (opts.payoutStatuses ?? []).map((status) => ({ status }) as PayoutRequest),
+      items: [...(opts.payoutStatuses ?? [])].map((status) => ({ status }) as PayoutRequest),
       nextCursor: opts.payoutAlwaysMore ? "more" : null,
     })),
   };
@@ -235,12 +235,14 @@ describe("decide: approving a deletion (interim rule, awaiting legal confirmatio
     expect(h.record).toHaveBeenCalledWith(ctx, expect.objectContaining({ result: "failure", detail: expect.objectContaining({ reason: "deletion_not_configured" }) }));
   });
 
-  it.each([
+  const blockerCases: Array<[string, HarnessOptions, string]> = [
     ["a balance", { balance: { ledgerKobo: 500, availableKobo: 500 } }, "balance"],
     ["held money", { balance: { ledgerKobo: 500, availableKobo: 0, heldKobo: 500 } }, "balance"],
     ["an open withdrawal", { payoutStatuses: ["paid", "approved"] }, "withdrawal"],
     ["an open refund", { openRefund: true }, "refund"],
-  ] as const)("is blocked by %s, stays in review and anonymizes nothing", async (_name, patch, word) => {
+  ];
+
+  it.each(blockerCases)("is blocked by %s, stays in review and anonymizes nothing", async (_name, patch, word) => {
     const h = harness({ grants: manage, stored: request("deletion"), ...patch });
     const result = await h.service.decide(ctx, approve);
     expect(result.ok).toBe(false);
@@ -298,6 +300,7 @@ describe("decide: approving a deletion (interim rule, awaiting legal confirmatio
 
   it("if the last status step fails after the work, says so, and deciding again finishes the job", async () => {
     const h = harness({ grants: manage, stored: request("deletion") });
+    // First call (received to in review) behaves normally, the second (in review to completed) fails once.
     h.serverPrivacy.setStatus.mockImplementationOnce(async (id: string, from: PrivacyRequestStatus, to: PrivacyRequestStatus) => {
       const current = h.store.get(id);
       if (!current || current.status !== from) return null;
