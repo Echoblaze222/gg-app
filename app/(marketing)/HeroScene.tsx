@@ -88,8 +88,8 @@ export function HeroScene() {
         <div className="depth hero-art mx-auto w-full max-w-[760px] lg:w-[76%]" style={z(0)}>
           <Image
             src="/illustrations/hero-scene.webp"
-            width={883}
-            height={460}
+            width={1027}
+            height={505}
             priority
             sizes="(min-width: 1024px) 760px, 100vw"
             alt="A glass piggy bank full of gold coins, with a receipt, a calendar, a shield and a phone floating around it."
