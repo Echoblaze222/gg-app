@@ -1,35 +1,32 @@
-/* Empty, error and success states. Icon shape differs per tone, color only supports it. */
 @layer components {
   .state {
     display: grid;
     justify-items: center;
     gap: var(--space-3);
-    padding: var(--space-12) var(--space-6);
+    padding: var(--space-10) var(--space-6);
     text-align: center;
   }
-  .state--compact {
-    padding: var(--space-8) var(--space-4);
-  }
-  .state__badge {
-    display: inline-grid;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-    border-radius: var(--radius-pill);
-    background-color: color-mix(in srgb, var(--color-ink) 6%, var(--color-surface));
+  .state__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--color-ink) 6%, transparent);
     color: var(--color-ink);
   }
-  .state--error .state__badge {
+  .state--error .state__icon {
     background-color: var(--color-error-surface);
     color: var(--color-error);
   }
-  .state--success .state__badge {
+  .state--success .state__icon {
     background-color: var(--color-success-surface);
     color: var(--color-success);
   }
-  .state__icon {
-    width: 28px;
-    height: 28px;
+  .state--offline .state__icon {
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning);
   }
   .state__title {
     margin: 0;
@@ -38,18 +35,12 @@
     font-weight: var(--weight-regular);
     line-height: var(--leading-tight);
   }
-  .state__text {
+  .state__message {
+    max-width: 40ch;
     margin: 0;
-    max-width: 34ch;
     color: var(--color-ink-muted);
-    font-size: var(--text-base);
-    line-height: var(--leading-normal);
   }
   .state__action {
-    margin-top: var(--space-3);
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-3);
+    margin-top: var(--space-2);
   }
 }

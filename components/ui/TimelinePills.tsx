@@ -1,96 +1,59 @@
-"use client";
-
-import type { ReactNode } from "react";
-import { StatusIcon } from "./StatusIcon";
 import { cx } from "./cx";
 
-export type TimelineStatus = "paid" | "upcoming" | "pending" | "overdue";
+export type StepState = "done" | "current" | "upcoming" | "failed";
 
-export interface TimelineItem {
+export interface TimelineStep {
   id: string;
-  /** Already formatted by the caller, for example "5 Dec". */
-  date: string;
-  /** What it is, for example "Instalment 3" or an amount the caller formatted. */
-  label: ReactNode;
-  status: TimelineStatus;
-  /** The next thing due. Drawn as the black pill, only one should be set. */
-  current?: boolean;
-  disabled?: boolean;
-  /** Gallery only: draws a state without a pointer. */
-  preview?: "hover" | "pressed" | "focus";
-}
-
-export interface TimelinePillsProps {
-  /** Accessible name of the list, for example "Contribution schedule". */
   label: string;
-  items: TimelineItem[];
-  /** Makes each pill a button. Without it the pills are plain list items. */
-  onSelect?: (id: string) => void;
-  /** Replace the default English status words. */
-  statusLabels?: Partial<Record<TimelineStatus, string>>;
-  className?: string;
+  state: StepState;
 }
 
-const DEFAULT_LABELS: Record<TimelineStatus, string> = {
-  paid: "Paid",
-  upcoming: "Upcoming",
-  pending: "Pending",
-  overdue: "Overdue",
+const stateText: Record<StepState, string> = {
+  done: "Completed",
+  current: "Current step",
+  upcoming: "Not reached yet",
+  failed: "Failed",
 };
 
-function UpcomingIcon() {
+function StepIcon({ state }: { state: StepState }) {
+  const common = { viewBox: "0 0 16 16", fill: "none", "aria-hidden": true as const, width: 16, height: 16, className: "pills__icon" };
+  const stroke = { stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (state === "done")
+    return (
+      <svg {...common}>
+        <path d="M3.5 8.5l3 3 6-7" {...stroke} />
+      </svg>
+    );
+  if (state === "failed")
+    return (
+      <svg {...common}>
+        <path d="M4 4l8 8M12 4l-8 8" {...stroke} />
+      </svg>
+    );
+  if (state === "current")
+    return (
+      <svg {...common}>
+        <circle cx="8" cy="8" r="3.5" fill="currentColor" />
+      </svg>
+    );
   return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="pill__icon">
-      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.75" strokeDasharray="3 3" />
+    <svg {...common}>
+      <circle cx="8" cy="8" r="3.5" {...stroke} />
     </svg>
   );
 }
 
-function PillIcon({ status }: { status: TimelineStatus }) {
-  if (status === "upcoming") return <UpcomingIcon />;
-  const tone = status === "paid" ? "success" : status === "overdue" ? "error" : "pending";
-  return <StatusIcon tone={tone} className="pill__icon" />;
-}
-
-/**
- * Contribution schedule as pills. A row with connectors from 768 px, a vertical list below.
- * Status is an icon and a word on every pill, never color alone. The pill for the next due item is black.
- */
-export function TimelinePills({ label, items, onSelect, statusLabels, className }: TimelinePillsProps) {
-  const words = { ...DEFAULT_LABELS, ...statusLabels };
+/** Steps of a process (a payment, a withdrawal). The caller maps server status to step states, this only draws them. */
+export function TimelinePills({ steps, label, className }: { steps: TimelineStep[]; label: string; className?: string }) {
   return (
-    <ol aria-label={label} className={cx("timeline", className)}>
-      {items.map((item) => {
-        const body = (
-          <>
-            <PillIcon status={item.status} />
-            <span className="pill__text">
-              <span className="pill__date">{item.date}</span>
-              <span className="pill__label">{item.label}</span>
-              <span className="pill__status">{words[item.status]}</span>
-            </span>
-          </>
-        );
-        const common = {
-          className: "pill",
-          "data-status": item.status,
-          "data-current": item.current ? "true" : undefined,
-          "data-preview": item.preview,
-        };
-        return (
-          <li key={item.id} className="timeline__item" aria-current={item.current ? "step" : undefined}>
-            {onSelect && !item.disabled ? (
-              <button type="button" {...common} onClick={() => onSelect(item.id)}>
-                {body}
-              </button>
-            ) : (
-              <div {...common} aria-disabled={item.disabled || undefined}>
-                {body}
-              </div>
-            )}
-          </li>
-        );
-      })}
+    <ol aria-label={label} className={cx("pills", className)}>
+      {steps.map((step) => (
+        <li key={step.id} className={cx("pills__item", `pills__item--${step.state}`)} aria-current={step.state === "current" ? "step" : undefined}>
+          <StepIcon state={step.state} />
+          <span>{step.label}</span>
+          <span className="sr-only">{`, ${stateText[step.state]}`}</span>
+        </li>
+      ))}
     </ol>
   );
 }

@@ -1,0 +1,80 @@
+@layer components {
+  .dtable {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .dtable__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+  .dtable__caption {
+    padding: 0 0 var(--space-3);
+    text-align: left;
+    font-weight: var(--weight-semibold);
+    font-size: var(--text-base);
+  }
+  .dtable__table th,
+  .dtable__table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+    text-align: left;
+    vertical-align: middle;
+  }
+  .dtable__table th {
+    color: var(--color-ink-muted);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+  }
+  .dtable__table [data-align="end"] {
+    text-align: right;
+  }
+
+  /* Phones: each row becomes a card. The explicit ARIA roles in the markup keep table semantics. */
+  @media (max-width: 767px) {
+    .dtable__table,
+    .dtable__table tbody,
+    .dtable__table tr,
+    .dtable__table td {
+      display: block;
+    }
+    /* Header row stays available to screen readers but is not drawn. */
+    .dtable__head {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    .dtable__row {
+      margin-bottom: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+      border-radius: var(--radius-lg);
+      background-color: var(--color-surface);
+    }
+    .dtable__table td {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-2) 0;
+      border: 0;
+      text-align: right;
+    }
+    .dtable__table td::before {
+      content: attr(data-label);
+      color: var(--color-ink-muted);
+      text-align: left;
+    }
+    .dtable__table td[data-primary="true"] {
+      display: block;
+      padding-bottom: var(--space-2);
+      font-size: var(--text-base);
+      font-weight: var(--weight-semibold);
+      text-align: left;
+    }
+    .dtable__table td[data-primary="true"]::before {
+      content: none;
+    }
+  }
+}

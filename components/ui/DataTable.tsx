@@ -1,118 +1,50 @@
-"use client";
-
 import type { ReactNode } from "react";
-import { Skeleton, SkeletonGroup } from "./Skeleton";
-import { EmptyState, ErrorState } from "./StateView";
-import { Button } from "./Button";
 import { cx } from "./cx";
 
-export interface DataColumn<Row> {
+export interface Column<Row> {
   key: string;
-  /** Column heading. On phones it becomes the label inside each card. */
   header: string;
   cell: (row: Row) => ReactNode;
   align?: "start" | "end";
-  /** The main cell of the row. On phones it is the card title and its label is hidden. One per table. */
+  /** The one column used as the card title on phones (usually a name or a receipt number). */
   primary?: boolean;
 }
 
 export interface DataTableProps<Row> {
-  /** Names the table for screen readers and is shown above it unless `hideCaption`. */
+  /** Required. Names the table for screen readers. */
   caption: string;
   hideCaption?: boolean;
-  columns: DataColumn<Row>[];
+  columns: Column<Row>[];
   rows: Row[];
   getRowId: (row: Row) => string;
-  /** The parent says it is loading. Placeholders show only after 300 ms. */
-  loading?: boolean;
-  loadingLabel?: string;
-  /** Set when the load failed. Say what happened and whether money moved where it applies. */
-  error?: string;
-  onRetry?: () => void;
-  emptyTitle?: string;
-  emptyText?: ReactNode;
-  emptyAction?: ReactNode;
   className?: string;
 }
 
-const SKELETON_ROWS = 4;
-
 /**
- * Real table from 768 px. Below that, every row becomes a card and each cell shows its own heading.
- * States: data, loading (skeleton), error (with retry), empty.
+ * A table on wide screens, a stack of cards on phones (below 768 px).
+ * Explicit ARIA roles keep the table semantics when CSS changes the display.
+ * An empty list is the caller's job: show a StateMessage instead of an empty table.
  */
-export function DataTable<Row>({
-  caption,
-  hideCaption,
-  columns,
-  rows,
-  getRowId,
-  loading,
-  loadingLabel = "Loading table",
-  error,
-  onRetry,
-  emptyTitle = "Nothing here yet",
-  emptyText,
-  emptyAction,
-  className,
-}: DataTableProps<Row>) {
-  if (loading) {
-    return (
-      <SkeletonGroup label={loadingLabel} className={cx("dtable dtable--loading", className)}>
-        {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-          <div key={index} className="dtable__skeleton-row">
-            <Skeleton width="40%" />
-            <Skeleton width="25%" />
-          </div>
-        ))}
-      </SkeletonGroup>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={cx("dtable dtable--state", className)}>
-        <ErrorState
-          compact
-          headingLevel={3}
-          title="Could not load this table"
-          action={onRetry ? <Button variant="secondary" onClick={onRetry}>Try again</Button> : undefined}
-        >
-          {error}
-        </ErrorState>
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div className={cx("dtable dtable--state", className)}>
-        <EmptyState compact headingLevel={3} title={emptyTitle} action={emptyAction}>
-          {emptyText}
-        </EmptyState>
-      </div>
-    );
-  }
-
+export function DataTable<Row>({ caption, hideCaption = false, columns, rows, getRowId, className }: DataTableProps<Row>) {
   return (
     <div className={cx("dtable", className)}>
-      <table className="dtable__table" role="table">
-        <caption className={cx("dtable__caption", hideCaption && "sr-only")}>{caption}</caption>
-        <thead role="rowgroup">
+      <table role="table" className="dtable__table">
+        <caption className={hideCaption ? "sr-only" : "dtable__caption"}>{caption}</caption>
+        <thead role="rowgroup" className="dtable__head">
           <tr role="row">
-            {columns.map((col) => (
-              <th key={col.key} scope="col" role="columnheader" data-align={col.align}>
-                {col.header}
+            {columns.map((column) => (
+              <th key={column.key} role="columnheader" scope="col" data-align={column.align ?? "start"}>
+                {column.header}
               </th>
             ))}
           </tr>
         </thead>
         <tbody role="rowgroup">
           {rows.map((row) => (
-            <tr key={getRowId(row)} role="row">
-              {columns.map((col) => (
-                <td key={col.key} role="cell" data-label={col.header} data-align={col.align} data-primary={col.primary ? "true" : undefined}>
-                  {col.cell(row)}
+            <tr key={getRowId(row)} role="row" className="dtable__row">
+              {columns.map((column) => (
+                <td key={column.key} role="cell" data-label={column.header} data-align={column.align ?? "start"} data-primary={column.primary ? "true" : undefined}>
+                  {column.cell(row)}
                 </td>
               ))}
             </tr>

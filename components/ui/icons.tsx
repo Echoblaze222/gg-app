@@ -1,91 +1,101 @@
-import type { ReactElement, SVGProps } from "react";
+import type { SVGProps } from "react";
 
-/** Small stroke icon set for navigation and controls. All decorative: the label next to them carries the meaning. */
-type IconProps = Omit<SVGProps<SVGSVGElement>, "children">;
-
-function Base({ children, ...rest }: IconProps & { children: ReactElement | ReactElement[] }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-      {...rest}
-    >
-      {children}
-    </svg>
-  );
+/** Small stroke icon set for navigation and states. Decorative: always hidden from screen readers, the label carries the meaning. */
+function base(props: SVGProps<SVGSVGElement>) {
+  return {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+    width: 24,
+    height: 24,
+    ...props,
+  };
 }
 
-export const HomeIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M4 11l8-7 8 7" />
-    <path d="M6 10v9h12v-9" />
-  </Base>
+export const HomeIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 11l8-7 8 7v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-8z" />
+  </svg>
 );
-
-export const WalletIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M4 7.5A2.5 2.5 0 016.5 5H18v14H6.5A2.5 2.5 0 014 16.5v-9z" />
-    <path d="M18 9.5h2v5h-2a2.5 2.5 0 010-5z" />
-  </Base>
-);
-
-export const ReceiptIcon = (p: IconProps) => (
-  <Base {...p}>
+export const ReceiptIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
     <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z" />
     <path d="M9 8h6M9 12h6" />
-  </Base>
+  </svg>
 );
-
-export const BellIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15L6 16z" />
-    <path d="M10 20.5a2 2 0 004 0" />
-  </Base>
+export const WalletIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 7a2 2 0 012-2h12v4" />
+    <path d="M4 7v10a2 2 0 002 2h14V9H6a2 2 0 01-2-2z" />
+    <circle cx="16.5" cy="14" r="1" />
+  </svg>
 );
-
-export const UserIcon = (p: IconProps) => (
-  <Base {...p}>
-    <circle cx="12" cy="8.5" r="3.5" />
-    <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
-  </Base>
+export const BellIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M6 17V11a6 6 0 1112 0v6l1.5 2h-15L6 17z" />
+    <path d="M10 21a2 2 0 004 0" />
+  </svg>
 );
-
-export const ShieldIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M12 3l7 3v5.5c0 4.2-2.8 7.4-7 9.5-4.2-2.1-7-5.3-7-9.5V6l7-3z" />
-    <path d="M9 12l2.2 2.2L15.5 10" />
-  </Base>
+export const UserIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c1-4 4-6 8-6s7 2 8 6" />
+  </svg>
 );
-
-export const SupportIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M5 6h14v10H10l-4 3.5V16H5V6z" />
-  </Base>
+export const ShieldIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
 );
-
-export const MenuIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M4 7h16M4 12h16M4 17h16" />
-  </Base>
+export const UsersIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20c.8-3.5 3.3-5.5 6.5-5.5s5.7 2 6.5 5.5" />
+    <path d="M16 4.8a3.5 3.5 0 010 6.4M18 14.7c1.7.7 2.9 2.4 3.5 5.3" />
+  </svg>
 );
-
-export const CloseIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M6 6l12 12M18 6L6 18" />
-  </Base>
+export const ChartIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+  </svg>
 );
-
-export const InboxIcon = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M4 13l2.5-7h11L20 13v6H4v-6z" />
-    <path d="M4 13h4.5l1 2.5h5l1-2.5H20" />
-  </Base>
+export const SettingsIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+  </svg>
+);
+export const HelpIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 114 2c-.8.6-1.5 1-1.5 2M12 17v.01" />
+  </svg>
+);
+export const InboxIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M3 13l3-8h12l3 8v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" />
+    <path d="M3 13h5l1 3h6l1-3h5" />
+  </svg>
+);
+export const WifiOffIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M3 3l18 18M5 9.5a11 11 0 013.5-2M19 9.5a11 11 0 00-6-3M8.5 13a6 6 0 017 0M12 18v.01" />
+  </svg>
+);
+export const AlertTriangleIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 3.5l9 16H3l9-16z" />
+    <path d="M12 10v4M12 17v.01" />
+  </svg>
+);
+export const CheckCircleIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12.5l3 3 5-6" />
+  </svg>
 );

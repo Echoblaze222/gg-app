@@ -1,0 +1,105 @@
+@layer components {
+  .dialog {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink);
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+  }
+  .dialog::backdrop {
+    background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+  }
+  .dialog--modal {
+    width: min(calc(100vw - var(--space-8)), 480px);
+  }
+  .dialog--sheet {
+    width: min(100vw, 560px);
+    margin: auto auto 0;
+  }
+  .dialog[open] {
+    animation: dialog-fade var(--motion-base) var(--ease-enter) both;
+  }
+  .dialog--sheet[open] {
+    animation-name: sheet-rise;
+  }
+
+  .dialog__panel {
+    display: grid;
+    gap: var(--space-3);
+    max-height: 85dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-6);
+    border-radius: var(--radius-xl);
+    background-color: var(--color-surface-raised);
+    box-shadow: var(--shadow-lg);
+  }
+  .dialog--sheet .dialog__panel {
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .dialog__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-regular);
+    line-height: var(--leading-tight);
+  }
+  .dialog__close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--target-min);
+    height: var(--target-min);
+    margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+  .dialog__description {
+    margin: 0;
+    color: var(--color-ink-muted);
+  }
+
+  html[data-scroll-locked] {
+    overflow: hidden;
+  }
+
+  @keyframes dialog-fade {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes sheet-rise {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dialog[open] {
+      animation: none;
+    }
+  }
+}
