@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
-import Image from "next/image";
 import { TiltScene } from "@/components/motion/TiltScene";
+import { Turntable } from "@/components/motion/Turntable";
 
 /**
- * Landing hero: the illustration in the middle, product cards floating at different depths around it.
+ * Landing hero: a 360 degree 3D piggy bank in the middle (drag to turn it), product cards floating at different depths around it.
  * Real facts only. The cards show states and rules from the product, never amounts, dates or user counts.
  * Below 1024 px the cards sit in a row under the illustration. From 1024 px they float around it.
  */
@@ -83,17 +83,20 @@ function SpinBadge() {
 
 export function HeroScene() {
   return (
-    <TiltScene maxTilt={7} className="mx-auto w-full max-w-5xl">
+    <TiltScene maxTilt={5} className="mx-auto w-full max-w-5xl">
       <div className="relative">
-        <div className="depth hero-art mx-auto w-full max-w-[760px] lg:w-[76%]" style={z(0)}>
-          <Image
-            src="/illustrations/hero-scene.webp"
-            width={1027}
-            height={505}
-            priority
-            sizes="(min-width: 1024px) 760px, 100vw"
-            alt="A glass piggy bank full of gold coins, with a receipt, a calendar, a shield and a phone floating around it."
-            className="h-auto w-full"
+        <div className="stage-spot" aria-hidden="true" />
+        <div className="depth relative mx-auto w-full max-w-[460px] pb-20 lg:w-[46%] lg:pb-14" style={z(40)}>
+          <Turntable
+            src="/illustrations/pig-360.webp"
+            frames={30}
+            columns={6}
+            rows={5}
+            frameWidth={440}
+            frameHeight={412}
+            poster="/illustrations/pig-poster.webp"
+            startYaw={-0.55}
+            label="Glass piggy bank full of gold coins"
           />
         </div>
 
