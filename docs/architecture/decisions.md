@@ -15,7 +15,7 @@ No floats. Balance is the sum of immutable ledger entries, not a column that is 
 The owner said there is one administrator. The schema still uses roles and permissions (`owner`, `admin`, `support`, `member`) so a second admin or a support person can be added later without a migration.
 
 ## ADR-005 Contribution means personal savings with withdrawal requests
-Members save on a daily, weekly or monthly schedule with any amount, and later request their money back. Each withdrawal is verified and approved by the owner. This is not a rotating (ajo or esusu) pool and not donations. Rules the owner has not answered (missed contribution handling, refunds policy, limits, BVN or NIN) are stored as configuration, not hard coded.
+Members save on a daily, weekly or monthly schedule with any amount, and later request their money back. Each withdrawal is verified and approved by the owner. This is not a rotating (ajo or esusu) pool and not donations. Rules the owner has not answered (missed contribution handling, refunds policy, limits) are stored as configuration, not hard coded.
 
 ## ADR-006 Payment attempt states follow the AI-4 brief
 `initiating`, `awaiting_authentication`, `processing`, `verifying`, `successful`, `failed`, `cancelled`, `expired`, plus `reversed` after success. `idle` is a client only state. Added `reversed` because the pack lists reversed payments as an edge case.
@@ -37,6 +37,9 @@ Next.js 16 renamed `middleware` to `proxy`. `proxy.ts` is correct. It only refre
 
 ## ADR-012 First push was made without lockfile, spec pack and images
 The first push to GitHub used the GitHub API, which cannot upload a 330 KB lockfile or binary images. `package-lock.json`, `RESEARCH.md`, `source-pack/`, `ai-briefs/` and `assets/` were therefore not part of it. Dependencies are exact-pinned in `package.json`, so the first `npm install` (for example on Vercel) produces a lockfile. Commit that lockfile as soon as it exists. The spec pack stays in the owner's zip files.
+
+## ADR-013 No BVN or NIN collection
+Decided by the owner on 2026-11-16: the platform does not collect BVN or NIN. No identity-number column exists in the schema and none may be added without a new ADR. Member identity rests on verified email, phone, the owner approving each withdrawal, and the payout step-up code.
 
 ## Accepted audit findings (dependencies)
 After the Next.js upgrade, `npm audit` reports only moderate findings in lint tooling (`@typescript-eslint`, `minimatch`, `eslint-config-next`) and one moderate in `baseline-browser-mapping` (build time browser data). None run in production request paths. Revisit at the finishing phase dependency audit.
