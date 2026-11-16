@@ -2,7 +2,8 @@
  * Decides what settlement does with a provider verify answer. Pure, no I/O.
  *
  * Invariant A2: credit only when the provider says success AND the reference, currency and amount
- * match the attempt we created (see amountMatches for the one allowed fee case). Anything else posts nothing.
+ * match the attempt we created (see amountMatches for the one allowed fee case, which the admin setting controls).
+ * Anything else posts nothing.
  * Invariant A3: the input here comes from the verify endpoint, never from a webhook body or a client.
  * Any status we do not recognise is treated as "still in progress", never as success.
  */
@@ -35,6 +36,21 @@ export interface ProviderVerification {
 
 export type MismatchReason = "reference" | "currency" | "amount";
 
+/**
+ * Who pays the provider's fees. An admin with `admin.settings.update` sets this in `payment.fee_bearer`
+ * to match the provider dashboard.
+ * - "merchant": the paid total must equal the attempt amount exactly (strict).
+ * - "customer": the provider adds its fees on top, so a total of requested amount plus fees is accepted too.
+ */
+export type FeeBearer = "merchant" | "customer";
+
+export const FEE_BEARER_SETTING_KEY = "payment.fee_bearer";
+
+/** Anything missing or unrecognised is "merchant", the strict choice, so a bad setting rejects more, never less. */
+export function parseFeeBearer(value: unknown): FeeBearer {
+  return value === "customer" ? "customer" : "merchant";
+}
+
 export type VerificationDecision =
   | { readonly kind: "settle" }
   | { readonly kind: "fail"; readonly failureCode: ErrorCode }
@@ -47,27 +63,32 @@ export function isProviderTxStatus(value: string): value is ProviderTxStatus {
 }
 
 /**
- * The amount is accepted in exactly two cases, both from provider data:
+ * The amount is accepted in at most two cases, both from provider data:
  * 1. the paid amount equals what we asked for, or
- * 2. the provider recorded our amount as the requested amount and the paid amount is that plus its
- *    own fees, which is what happens when fees are passed to the customer.
- * A higher total with no matching requested amount and fees is still a mismatch.
+ * 2. only when the admin setting says the customer bears the fees: the provider recorded our amount as
+ *    the requested amount and the paid amount is that plus its own fees.
+ * A higher total with no matching requested amount and fees is always a mismatch.
  * The ledger always credits the attempt amount, never the provider total.
  */
-function amountMatches(expected: ExpectedPayment, actual: ProviderVerification): boolean {
+function amountMatches(expected: ExpectedPayment, actual: ProviderVerification, feeBearer: FeeBearer): boolean {
   if (!isKobo(actual.amountKobo)) return false;
   if (actual.amountKobo === expected.amountKobo) return true;
+  if (feeBearer !== "customer") return false;
   const { requestedAmountKobo, feesKobo } = actual;
   if (!isKobo(requestedAmountKobo) || !isKobo(feesKobo)) return false;
   return requestedAmountKobo === expected.amountKobo && actual.amountKobo === requestedAmountKobo + feesKobo;
 }
 
-function matchMoney(expected: ExpectedPayment, actual: ProviderVerification): MismatchReason | null {
+function matchMoney(expected: ExpectedPayment, actual: ProviderVerification, feeBearer: FeeBearer): MismatchReason | null {
   if (actual.currency.toUpperCase() !== expected.currency) return "currency";
-  return amountMatches(expected, actual) ? null : "amount";
+  return amountMatches(expected, actual, feeBearer) ? null : "amount";
 }
 
-export function evaluateVerification(expected: ExpectedPayment, actual: ProviderVerification): VerificationDecision {
+export function evaluateVerification(
+  expected: ExpectedPayment,
+  actual: ProviderVerification,
+  feeBearer: FeeBearer = "merchant",
+): VerificationDecision {
   // An answer about a different reference is never trusted, whatever status it carries.
   if (actual.reference !== expected.reference) return { kind: "mismatch", reason: "reference" };
 
@@ -75,11 +96,11 @@ export function evaluateVerification(expected: ExpectedPayment, actual: Provider
 
   switch (actual.status) {
     case "success": {
-      const mismatch = matchMoney(expected, actual);
+      const mismatch = matchMoney(expected, actual, feeBearer);
       return mismatch ? { kind: "mismatch", reason: mismatch } : { kind: "settle" };
     }
     case "reversed": {
-      const mismatch = matchMoney(expected, actual);
+      const mismatch = matchMoney(expected, actual, feeBearer);
       return mismatch ? { kind: "mismatch", reason: mismatch } : { kind: "reversed" };
     }
     case "failed":
