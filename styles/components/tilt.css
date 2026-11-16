@@ -79,6 +79,16 @@
     -webkit-tap-highlight-color: transparent;
     border-radius: var(--radius-lg);
   }
+  /* The flat picture of the object is one plane. Everything that orbits sits in front of and behind it. */
+  .turntable {
+    transform-style: preserve-3d;
+  }
+  .turntable__sprite {
+    position: absolute;
+    inset: 0;
+    transform-style: flat;
+    pointer-events: none;
+  }
   .turntable:active {
     cursor: grabbing;
   }
@@ -123,7 +133,7 @@
     position: absolute;
     left: 50%;
     bottom: -20%;
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 260px);
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -135,6 +145,70 @@
     font-size: 0.8125rem;
     white-space: nowrap;
     pointer-events: none;
+  }
+
+  /* Objects that circle the pig. --spin comes from the Turntable. Each item is placed on a ring, then turned back to face the viewer. */
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .orbit {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    pointer-events: none;
+    --r: min(38vw, 205px);
+  }
+  .orbit__ring {
+    position: absolute;
+    left: 50%;
+    top: 52%;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    transform: rotateX(-13deg);
+  }
+  .orbit__item {
+    --turn: calc(var(--a, 0deg) - var(--spin, 0deg));
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--w-sm, 60px);
+    transform-style: preserve-3d;
+    transform: rotateY(var(--turn)) translateZ(var(--r)) rotateY(calc(var(--turn) * -1)) rotateX(13deg)
+      translate(-50%, calc(-50% + var(--lift, 0) * var(--r)));
+    filter: drop-shadow(0 6px 5px rgb(14 16 20 / 0.18));
+    color: var(--color-ink);
+  }
+  @media (min-width: 768px) {
+    .orbit__item {
+      width: var(--w-md, 80px);
+    }
+  }
+  .orbit__bob > svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .orbit__bob--a {
+    animation: orbit-bob-a 6s ease-in-out infinite;
+  }
+  .orbit__bob--b {
+    animation: orbit-bob-b 7.5s ease-in-out infinite;
+  }
+  .orbit__bob--c {
+    animation: orbit-bob-c 6.8s ease-in-out infinite;
+  }
+  @keyframes orbit-bob-a {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-7px) rotate(2deg); }
+  }
+  @keyframes orbit-bob-b {
+    0%, 100% { transform: translateY(-4px) rotate(1.5deg); }
+    50% { transform: translateY(5px) rotate(-1.5deg); }
+  }
+  @keyframes orbit-bob-c {
+    0%, 100% { transform: translateY(3px); }
+    50% { transform: translateY(-8px); }
   }
 
   /* Light pooling behind the object, so it does not sit on a flat page. */
@@ -149,6 +223,9 @@
   @media (prefers-reduced-motion: reduce) {
     .tilt__scene {
       transform: none;
+    }
+    .orbit__bob {
+      animation: none;
     }
     .float-a,
     .float-b,
