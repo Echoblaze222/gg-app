@@ -1,12 +1,58 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Alert, Button, Card, Input, Skeleton, SkeletonGroup, ToastProvider } from "@/components/ui";
+import {
+  Alert,
+  BellIcon,
+  BottomTabBar,
+  Button,
+  Card,
+  DataTable,
+  HomeIcon,
+  Input,
+  ProgressRing,
+  ReceiptIcon,
+  SideNav,
+  Skeleton,
+  SkeletonGroup,
+  StateMessage,
+  TimelinePills,
+  ToastProvider,
+  UserIcon,
+  WalletIcon,
+} from "@/components/ui";
+import type { Column, NavItem } from "@/components/ui";
 import type { ButtonProps } from "@/components/ui";
-import { DismissibleAlertDemo, ToastDemo } from "./ClientDemos";
+import { DialogDemo, DismissibleAlertDemo, ToastDemo } from "./ClientDemos";
 
 export const metadata: Metadata = { title: "Design gallery", robots: { index: false, follow: false } };
 
 const variants: NonNullable<ButtonProps["variant"]>[] = ["primary", "secondary", "accent", "quiet"];
+
+const navItems: NavItem[] = [
+  { href: "/app", label: "Home", icon: <HomeIcon />, exact: true },
+  { href: "/app/history", label: "History", icon: <ReceiptIcon /> },
+  { href: "/app/pay", label: "Pay", icon: <WalletIcon /> },
+  { href: "/app/notifications", label: "Alerts", icon: <BellIcon />, badge: 3, badgeLabel: "unread" },
+  { href: "/app/profile", label: "Profile", icon: <UserIcon /> },
+];
+
+interface PaymentRow {
+  receipt: string;
+  date: string;
+  amount: string;
+  status: string;
+}
+const paymentRows: PaymentRow[] = [
+  { receipt: "GG-000121", date: "12 Nov 2026", amount: "NGN 5,000", status: "Paid" },
+  { receipt: "GG-000118", date: "05 Nov 2026", amount: "NGN 5,000", status: "Paid" },
+  { receipt: "GG-000112", date: "29 Oct 2026", amount: "NGN 2,000", status: "Pending" },
+];
+const paymentColumns: Column<PaymentRow>[] = [
+  { key: "receipt", header: "Receipt", cell: (r) => r.receipt, primary: true },
+  { key: "date", header: "Date", cell: (r) => r.date },
+  { key: "amount", header: "Amount", cell: (r) => r.amount, align: "end" },
+  { key: "status", header: "Status", cell: (r) => r.status },
+];
 
 function Row({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -178,6 +224,115 @@ export default function DesignGalleryPage() {
           </h2>
           <p className="text-sm text-ink-muted">Hover or focus a toast to pause it. Errors stay until dismissed. At most three show at once.</p>
           <ToastDemo />
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-dialog">
+          <h2 id="gallery-dialog" className="text-2xl">
+            Dialog and sheet
+          </h2>
+          <p className="text-sm text-ink-muted">Native dialog element. Try Escape, Tab, and the backdrop. The locked one ignores all of them.</p>
+          <DialogDemo />
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-state">
+          <h2 id="gallery-state" className="text-2xl">
+            State messages
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card>
+              <StateMessage
+                kind="empty"
+                title="No payments yet"
+                message="Your receipts will show here after your first contribution."
+                action={<Button variant="primary">Contribute</Button>}
+                headingLevel={3}
+              />
+            </Card>
+            <Card>
+              <StateMessage
+                kind="error"
+                title="We could not load this"
+                message="Nothing was charged. Check your connection and try again."
+                action={<Button variant="secondary">Try again</Button>}
+                headingLevel={3}
+              />
+            </Card>
+            <Card>
+              <StateMessage kind="offline" title="You are offline" message="Your last saved balance is shown. Payments need a connection." headingLevel={3} />
+            </Card>
+            <Card>
+              <StateMessage kind="success" title="Contribution received" message="Your receipt is ready." headingLevel={3} />
+            </Card>
+          </div>
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-ring">
+          <h2 id="gallery-ring" className="text-2xl">
+            Progress ring
+          </h2>
+          <div className="flex flex-wrap items-center gap-8">
+            <ProgressRing value={0} label="Not started">
+              <span className="text-xl">0%</span>
+            </ProgressRing>
+            <ProgressRing value={42} label="Contribution progress" valueText="NGN 21,000 of 50,000">
+              <span className="text-xl">42%</span>
+            </ProgressRing>
+            <ProgressRing value={100} label="Goal reached">
+              <span className="text-xl">100%</span>
+            </ProgressRing>
+          </div>
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-pills">
+          <h2 id="gallery-pills" className="text-2xl">
+            Timeline pills
+          </h2>
+          <TimelinePills
+            label="Payment in progress"
+            steps={[
+              { id: "1", label: "Started", state: "done" },
+              { id: "2", label: "Checking with the bank", state: "current" },
+              { id: "3", label: "Confirmed", state: "upcoming" },
+            ]}
+          />
+          <TimelinePills
+            label="Payment that failed"
+            steps={[
+              { id: "1", label: "Started", state: "done" },
+              { id: "2", label: "Bank declined", state: "failed" },
+              { id: "3", label: "Confirmed", state: "upcoming" },
+            ]}
+          />
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-nav">
+          <h2 id="gallery-nav" className="text-2xl">
+            Navigation
+          </h2>
+          <p className="text-sm text-ink-muted">The tab bar is fixed to the bottom of a real screen. Here it is held inside a box.</p>
+          <div className="relative h-32 overflow-hidden rounded-lg border border-ink/10 [transform:translateZ(0)]">
+            <BottomTabBar items={navItems} currentPath="/app/history/GG-000121" label="Member tabs" />
+          </div>
+          <div className="rounded-lg border border-ink/10">
+            <SideNav
+              label="Admin sections"
+              currentPath="/app/history"
+              header={<span className="font-display text-2xl">GG</span>}
+              sections={[
+                { title: "Member", items: navItems.slice(0, 3) },
+                { title: "Account", items: navItems.slice(3) },
+              ]}
+              footer={<Button variant="quiet">Sign out</Button>}
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-table">
+          <h2 id="gallery-table" className="text-2xl">
+            Data table
+          </h2>
+          <p className="text-sm text-ink-muted">Narrow your window below 768 px to see the rows become cards.</p>
+          <DataTable caption="Recent payments" columns={paymentColumns} rows={paymentRows} getRowId={(r) => r.receipt} />
         </section>
       </main>
     </ToastProvider>

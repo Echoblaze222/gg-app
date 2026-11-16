@@ -2,9 +2,9 @@
 
 Read this before building any screen. Import from `@/components/ui` and `@/lib/motion`. Never restyle these with one off CSS. If something is missing, write a request in `docs/handoffs/ai5-to-ai3-<topic>.md`.
 
-Gallery: `/design-gallery` and `/design-gallery/components` (development only, ADR-008). They show every state of every component below.
+Gallery: `/design-gallery` (development only, ADR-008). It shows every state of every component below.
 
-Updated: 2026-11-15, cover milestone 3 (layout components, brand and landing page added).
+Updated: 2026-11-15, M3a (Dialog, StateMessage, ProgressRing, TimelinePills, Navigation, DataTable, icons added).
 
 ## Ready
 
@@ -25,12 +25,6 @@ import { Button } from "@/components/ui";
 | `leadingIcon`, `trailingIcon` | node | Shown in `idle` only |
 
 Behavior you can rely on: loading and success lock the button (no double submit, a submit button will not submit); failure stays pressable for retry; the loader ring appears only after 300 ms; reduced motion shows a static ring; focus stays on the button during loading.
-
-### LinkButton (`components/ui/LinkButton.tsx`)
-```tsx
-<LinkButton href="/register" size="lg" variant="primary">Get started</LinkButton>
-```
-A navigation link drawn as a pill, same variants and sizes as Button. Use it to go to a page. Use Button for anything that changes data, because only Button has loading, success and failure states.
 
 ### Input (`components/ui/Input.tsx`)
 ```tsx
@@ -73,44 +67,54 @@ toast.show({ tone: "error", title: "Payment failed", message: "No money left you
 ```
 5 s default, hover or focus pauses it, errors never auto close, at most 3 visible. If the app has a bottom tab bar set `--toast-offset-bottom` on `:root` to its height so toasts sit above it. Swipe to dismiss comes later with the gesture work.
 
-### EmptyState, ErrorState, SuccessState (`components/ui/StateView.tsx`)
+### Dialog (`components/ui/Dialog.tsx`)
 ```tsx
-<ErrorState title="Payment failed" action={<Button>Try again</Button>}>No money left your account. Check your card details and try again.</ErrorState>
+const [open, setOpen] = useState(false);
+<Dialog open={open} onClose={() => setOpen(false)} title="Remove this card?" description="You can add it again later.">
+  ...buttons...
+</Dialog>
+<Dialog open={open} onClose={close} variant="sheet" title="Choose a payment method">...</Dialog>
+<Dialog open={paying} onClose={close} dismissible={false} title="Checking your payment">...</Dialog>
 ```
-Full screen or inline (`compact`). Errors are announced at once, success politely, empty is plain content. Each tone has its own icon shape. Set `headingLevel` so the page outline stays correct.
+Native dialog element, so the browser traps focus, handles Escape and returns focus. `dismissible={false}` turns off Escape, the backdrop and the close button: use it while a payment is in flight. Modal is centered, `variant="sheet"` rises from the bottom. No exit animation yet and no nested dialogs. Decision: `docs/design/decisions/004-dialog-native.md`.
 
-### Modal and Sheet (`components/ui/Overlay.tsx`)
+### StateMessage (`components/ui/StateMessage.tsx`)
 ```tsx
-<Modal open={open} onClose={close} busy={paying} busyLabel="Confirming your payment" title="Confirm contribution" footer={<Button>Confirm</Button>}>...</Modal>
-<Sheet open={open} onClose={close} side="bottom" title="More">...</Sheet>   // side="end" is a right hand panel from 768 px
+<StateMessage kind="empty" title="No payments yet" message="Your receipts will show here." action={<Button>Contribute</Button>} />
 ```
-Focus is trapped and returned, Escape, backdrop and the close button dismiss, page scroll is locked. While `busy` all three dismiss paths are locked, so nobody walks away from a half finished payment. The parent sets `busy`.
-
-### Sidebar and BottomTabBar (`components/ui/Nav.tsx`)
-```tsx
-const items: NavItem[] = [{ href: "/home", label: "Home", icon: <HomeIcon />, current: true }, { href: "/alerts", label: "Alerts", icon: <BellIcon />, badge: 3 }];
-<Sidebar label="Main" items={items} header={<Wordmark />} />   // wide screens
-<BottomTabBar label="Main" items={items} />                     // phones, at most 5 items, fixed to the bottom
-```
-The current page is a black pill in both. The parent decides `current` (for example from `usePathname`). Labels always show. Icons: `HomeIcon`, `WalletIcon`, `ReceiptIcon`, `BellIcon`, `UserIcon`, `ShieldIcon`, `SupportIcon`, `MenuIcon`, `CloseIcon`, `InboxIcon`.
-
-### TimelinePills (`components/ui/TimelinePills.tsx`)
-```tsx
-<TimelinePills label="Contribution schedule" items={[{ id: "a", date: "5 Dec", label: "Instalment 3", status: "upcoming", current: true }]} />
-```
-Vertical list on phones, a row from 768 px. Status (`paid`, `upcoming`, `pending`, `overdue`) is an icon and a word on every pill. The next due pill is black. Pass `onSelect` to make pills buttons.
+Kinds: `empty`, `error`, `offline`, `success`, each with its own icon. Error text must say what happened and whether money moved. Page content, not a live announcement (use Alert or Toast for events). `headingLevel` 2 or 3.
 
 ### ProgressRing (`components/ui/ProgressRing.tsx`)
 ```tsx
-<ProgressRing value={42} max={60} label="Cycle collection" caption="42 of 60 paid" status="idle" />
+<ProgressRing value={42} label="Contribution progress" valueText="NGN 21,000 of 50,000"><span>42%</span></ProgressRing>
 ```
-Only for a real ratio. The parent sets `status` (`idle`, `loading`, `success`, `failure`). The ring never decides success from the number.
+`value` 0 to 100 (clamped), `label` required, `valueText` is what screen readers hear. Children show in the middle.
+
+### TimelinePills (`components/ui/TimelinePills.tsx`)
+```tsx
+<TimelinePills label="Payment progress" steps={[{ id: "1", label: "Started", state: "done" }, { id: "2", label: "Checking", state: "current" }, { id: "3", label: "Confirmed", state: "upcoming" }]} />
+```
+States: `done`, `current`, `upcoming`, `failed`. You map the server status to these. Each pill has an icon and hidden state text.
+
+### Navigation (`components/ui/Navigation.tsx`)
+```tsx
+const pathname = usePathname(); // in a client component of the shell
+<BottomTabBar items={memberItems} currentPath={pathname} label="Member" />   // phones, 2 to 5 items
+<SideNav sections={[{ title: "Members", items }]} currentPath={pathname} header={<Wordmark />} footer={<SignOut />} />
+```
+Item: `{ href, label, icon, badge?, badgeLabel?, exact? }`. Use `exact: true` for roots such as `/app`. Active item gets `aria-current="page"`, bold text and an indicator bar. The tab bar lifts toasts above it automatically (browsers with `:has()`). Icons: `HomeIcon`, `ReceiptIcon`, `WalletIcon`, `BellIcon`, `UserIcon`, `ShieldIcon`, `UsersIcon`, `ChartIcon`, `SettingsIcon`, `HelpIcon`, `InboxIcon`, `WifiOffIcon`, `AlertTriangleIcon`, `CheckCircleIcon`. `isActivePath(current, href, exact)` is exported if you need it.
 
 ### DataTable (`components/ui/DataTable.tsx`)
 ```tsx
-<DataTable caption="Payments" columns={columns} rows={rows} getRowId={(r) => r.id} loading={loading} error={error} onRetry={reload} emptyTitle="No payments yet" />
+<DataTable caption="Recent payments" columns={[{ key: "receipt", header: "Receipt", cell: (r) => r.receipt, primary: true }, { key: "amount", header: "Amount", cell: (r) => r.amount, align: "end" }]} rows={rows} getRowId={(r) => r.receipt} />
 ```
-A real table from 768 px, cards below it. States: data, loading (skeleton after 300 ms), error with retry, empty. Mark one column `primary` as the card title on phones.
+A table from 768 px up, cards below. Caption required (`hideCaption` hides it visually). For no rows, show a StateMessage instead of an empty table.
+
+### LinkButton (`components/ui/LinkButton.tsx`)
+```tsx
+<LinkButton href="/register" size="lg" variant="primary">Get started</LinkButton>
+```
+A navigation link drawn as a pill, same variants and sizes as Button. Use it to go to a page. Use Button for anything that changes data, because only Button has loading, success and failure states.
 
 ### Brand (`components/brand/`)
 ```tsx
@@ -134,4 +138,4 @@ Names are frozen in `contracts/design-tokens.md`. In Tailwind: `bg-canvas`, `bg-
 Rules: one accent hue; status is never color alone (icon and text too); card hairlines use `border-ink/10`, controls use `border-border`.
 
 ## Next (in this order)
-The animation catalogue (receipt printer, payment stages, login button, OTP), then the auth screens.
+The animation catalogue (task 2), receipt printer and auth screens (task 3), then the full a11y and device pass (task 6). Details: `docs/design/m3-log.md`.
