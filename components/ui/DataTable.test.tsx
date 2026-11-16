@@ -1,81 +1,73 @@
-import { act, cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { DataTable } from "./DataTable";
-import type { DataColumn } from "./DataTable";
+import type { Column } from "./DataTable";
 
-afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
-});
+afterEach(cleanup);
 
 interface Row {
-  id: string;
-  reference: string;
+  receipt: string;
   amount: string;
   status: string;
 }
-
 const rows: Row[] = [
-  { id: "1", reference: "GG-0001", amount: "NGN 5,000", status: "Paid" },
-  { id: "2", reference: "GG-0002", amount: "NGN 5,000", status: "Pending" },
+  { receipt: "GG-001", amount: "NGN 5,000", status: "Paid" },
+  { receipt: "GG-002", amount: "NGN 2,000", status: "Pending" },
 ];
-
-const columns: DataColumn<Row>[] = [
-  { key: "reference", header: "Reference", cell: (r) => r.reference, primary: true },
+const columns: Column<Row>[] = [
+  { key: "receipt", header: "Receipt", cell: (r) => r.receipt, primary: true },
   { key: "amount", header: "Amount", cell: (r) => r.amount, align: "end" },
   { key: "status", header: "Status", cell: (r) => r.status },
 ];
+const setup = (props = {}) => render(<DataTable caption="Payments" columns={columns} rows={rows} getRowId={(r) => r.receipt} {...props} />);
 
 describe("DataTable", () => {
-  it("renders a captioned table with headers and a row per item", () => {
-    render(<DataTable caption="Payments" columns={columns} rows={rows} getRowId={(r) => r.id} />);
-    const table = screen.getByRole("table", { name: "Payments" });
-    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Reference", "Amount", "Status"]);
-    expect(within(table).getAllByRole("row")).toHaveLength(3);
+  it("is a table named by its caption", () => {
+    setup();
+    expect(screen.getByRole("table", { name: "Payments" })).toBeInTheDocument();
   });
 
-  it("labels every cell with its heading so rows can collapse to cards", () => {
-    render(<DataTable caption="Payments" columns={columns} rows={rows} getRowId={(r) => r.id} />);
-    const cells = screen.getAllByRole("cell");
-    expect(cells[1]).toHaveAttribute("data-label", "Amount");
+  it("has column headers and a row per item", () => {
+    setup();
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Receipt", "Amount", "Status"]);
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+  });
+
+  it("renders cell content from the column functions", () => {
+    setup();
+    const row = screen.getAllByRole("row")[1];
+    expect(within(row).getAllByRole("cell").map((c) => c.textContent)).toEqual(["GG-001", "NGN 5,000", "Paid"]);
+  });
+
+  it("labels every cell so phones can show label and value", () => {
+    setup();
+    const cells = within(screen.getAllByRole("row")[2]).getAllByRole("cell");
+    expect(cells.map((c) => c.getAttribute("data-label"))).toEqual(["Receipt", "Amount", "Status"]);
+  });
+
+  it("marks the primary column and alignment for styling", () => {
+    setup();
+    const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
     expect(cells[0]).toHaveAttribute("data-primary", "true");
-    expect(cells.filter((c) => c.getAttribute("data-primary") === "true")).toHaveLength(2);
+    expect(cells[1]).not.toHaveAttribute("data-primary");
+    expect(cells[1]).toHaveAttribute("data-align", "end");
+    expect(cells[2]).toHaveAttribute("data-align", "start");
   });
 
   it("can hide the caption visually and keep it for screen readers", () => {
-    render(<DataTable caption="Payments" hideCaption columns={columns} rows={rows} getRowId={(r) => r.id} />);
+    setup({ hideCaption: true });
     expect(screen.getByText("Payments")).toHaveClass("sr-only");
+    expect(screen.getByRole("table", { name: "Payments" })).toBeInTheDocument();
   });
 
-  it("shows an empty state when there are no rows", () => {
-    render(
-      <DataTable caption="Payments" columns={columns} rows={[]} getRowId={(r) => r.id} emptyTitle="No payments yet" emptyText="Payments you make will show here." />,
-    );
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.getByRole("heading", { name: "No payments yet" })).toBeInTheDocument();
+  it("keeps rows stable by id when the order changes", () => {
+    const { rerender } = setup();
+    rerender(<DataTable caption="Payments" columns={columns} rows={[...rows].reverse()} getRowId={(r) => r.receipt} />);
+    expect(within(screen.getAllByRole("row")[1]).getAllByRole("cell")[0]).toHaveTextContent("GG-002");
   });
 
-  it("shows an error with a retry and announces it", async () => {
-    const onRetry = vi.fn();
-    render(
-      <DataTable caption="Payments" columns={columns} rows={rows} getRowId={(r) => r.id} error="We could not load your payments. No money moved." onRetry={onRetry} />,
-    );
-    expect(screen.getByRole("alert")).toHaveTextContent("No money moved.");
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows skeleton rows only after 300 ms and announces loading once", () => {
-    vi.useFakeTimers();
-    const { container } = render(
-      <DataTable caption="Payments" columns={columns} rows={[]} getRowId={(r) => r.id} loading loadingLabel="Loading payments" />,
-    );
-    expect(container.querySelector(".skeleton")).toBeNull();
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
-    expect(container.querySelectorAll(".skeleton").length).toBeGreaterThan(0);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading payments");
+  it("renders only the header for no rows (empty states are the caller's job)", () => {
+    setup({ rows: [] });
+    expect(screen.getAllByRole("row")).toHaveLength(1);
   });
 });
