@@ -102,4 +102,17 @@ describe("Turntable", () => {
       expect(layer).toHaveAttribute("aria-hidden", "true");
     }
   });
+
+  it("renders children in the same space and keeps --spin in step with the turn", async () => {
+    render(
+      <Turntable {...props}>
+        <span data-testid="orbiter" />
+      </Turntable>,
+    );
+    const slider = screen.getByRole("slider");
+    expect(slider).toContainElement(screen.getByTestId("orbiter"));
+    act(() => slider.focus());
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    await waitFor(() => expect(slider.style.getPropertyValue("--spin")).toBe("12.00deg"));
+  });
 });

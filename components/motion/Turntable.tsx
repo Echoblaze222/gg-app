@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useReducedMotion } from "@/lib/motion";
 
 export interface TurntableProps {
@@ -25,6 +25,11 @@ export interface TurntableProps {
   /** Largest width in CSS pixels. Default 460. */
   maxWidth?: number;
   className?: string;
+  /**
+   * Decoration that should turn with the object, for example OrbitObjects. It is placed in the same 3D space.
+   * The viewer sets the CSS variable --spin (degrees turned so far) on itself, and children can read it.
+   */
+  children?: ReactNode;
 }
 
 const AUTO_FRAMES_PER_SECOND = 0.5;
@@ -56,6 +61,7 @@ export function Turntable({
   stage = true,
   maxWidth = 460,
   className = "",
+  children,
 }: TurntableProps) {
   const root = useRef<HTMLDivElement>(null);
   const layerA = useRef<HTMLDivElement>(null);
@@ -80,6 +86,7 @@ export function Turntable({
     drawnFrame: -1,
     drawnMix: -1,
     drawnStamp: -1,
+    drawnSpin: -1,
   });
   const api = useRef<{ kick: () => void }>({ kick: () => {} });
 
@@ -109,6 +116,7 @@ export function Turntable({
     state.current.drawnFrame = -1;
     state.current.drawnMix = -1;
     state.current.drawnStamp = -1;
+    state.current.drawnSpin = -1;
     api.current.kick();
   }, [ready]);
 
@@ -141,6 +149,11 @@ export function Turntable({
         place(a, f0);
         place(b, f1);
         s.drawnFrame = f0;
+      }
+      const spin = Math.round(p * 200) / 200;
+      if (spin !== s.drawnSpin) {
+        s.drawnSpin = spin;
+        host.style.setProperty("--spin", `${((spin / frames) * 360).toFixed(2)}deg`);
       }
       const stamp = Math.round(p * 50) / 50;
       if (mix !== s.drawnMix) {
@@ -341,6 +354,7 @@ export function Turntable({
         Drag sideways or use the left and right arrow keys to turn it all the way round.
       </span>
 
+      <div className="turntable__sprite" aria-hidden="true">
       {stage ? (
         <>
           <svg className="turntable__platform" viewBox="0 0 200 60" aria-hidden="true" focusable="false">
@@ -370,6 +384,9 @@ export function Turntable({
 
       <div ref={layerA} className="turntable__layer" style={sheetStyle} aria-hidden="true" />
       <div ref={layerB} className="turntable__layer" style={{ ...sheetStyle, opacity: 0 }} aria-hidden="true" />
+      </div>
+
+      {children}
 
       {!touched ? (
         <span className="turntable__hint" aria-hidden="true">
