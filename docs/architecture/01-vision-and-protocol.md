@@ -8,10 +8,11 @@ Confirmed by the owner: Paystack as processor, naira only, Next.js with Supabase
 Still unanswered (the design keeps these configurable and never hard codes them):
 - What happens on a missed contribution (penalty, grace days, trust score change).
 - Refund policy and who may refund.
-- Whether identity verification (BVN or NIN) is required.
 - Whether the manual bank transfer channel from the legacy app stays.
 - Migration of existing legacy users.
 - Late fees, minimum and maximum contribution, and minimum payout.
+
+Decided: identity numbers (BVN or NIN) are not collected, see ADR-013.
 
 Legal flag: holding member money and paying it out on request may count as a regulated activity in Nigeria. This is not legal advice. The launch gate in `07-FINISHING-PHASE.md` section 5 stays blocking.
 
