@@ -26,11 +26,11 @@ export function LoginForm({ action }: LoginFormProps) {
     <form action={formAction} noValidate className="auth__form" key={state.status === "error" ? state.attempt : 0} data-failed={state.status === "error" ? "true" : undefined}>
       <FormAlert state={state} />
       <Input
-        label="Email or phone number"
+        label="Email"
         name="identifier"
-        type="text"
+        type="email"
         inputMode="email"
-        autoComplete="username"
+        autoComplete="email"
         autoCapitalize="none"
         spellCheck={false}
         required
