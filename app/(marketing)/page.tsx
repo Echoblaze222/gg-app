@@ -1,7 +1,11 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Wordmark } from "@/components/brand";
+import { TiltScene } from "@/components/motion/TiltScene";
 import { Card, LinkButton } from "@/components/ui";
+import { HeroScene } from "./HeroScene";
 
 export const metadata: Metadata = {
   title: "GG Contribution | Contribute on your own schedule",
@@ -10,9 +14,24 @@ export const metadata: Metadata = {
 };
 
 const steps = [
-  { n: "1", title: "Choose a plan", body: "Pick what you contribute and how often, or make a one time contribution." },
-  { n: "2", title: "Contribute", body: "Pay in naira on Paystack's secure page. You never type card details into our screens." },
-  { n: "3", title: "Get a verified receipt", body: "We confirm the payment with Paystack first. Only then do we record it and issue your receipt." },
+  {
+    n: "1",
+    title: "Choose a plan",
+    body: "Pick what you contribute and how often, or make a one time contribution.",
+    art: { src: "/illustrations/savings-goal.webp", width: 470, height: 492 },
+  },
+  {
+    n: "2",
+    title: "Contribute",
+    body: "Pay in naira on Paystack's secure page. You never type card details into our screens.",
+    art: { src: "/illustrations/contribution-success.webp", width: 403, height: 756 },
+  },
+  {
+    n: "3",
+    title: "Get a verified receipt",
+    body: "We confirm the payment with Paystack first. Only then do we record it and issue your receipt.",
+    art: { src: "/illustrations/receipt-verified.webp", width: 733, height: 414 },
+  },
 ];
 
 const trust = [
@@ -46,34 +65,6 @@ function Arrow() {
   );
 }
 
-/** An illustration of a receipt. It carries no amounts or dates on purpose: those would be invented numbers. */
-function ReceiptArt() {
-  return (
-    <svg viewBox="0 0 240 300" className="mx-auto w-full max-w-[280px]" role="img" aria-label="Illustration of a receipt with a Verified stamp">
-      <path
-        d="M20 10h200v264l-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10-12.5 10-12.5-10z"
-        fill="#ffffff"
-        stroke="#111111"
-        strokeOpacity="0.14"
-        strokeWidth="2"
-      />
-      <rect x="44" y="40" width="72" height="10" rx="5" fill="#111111" />
-      <rect x="44" y="66" width="120" height="8" rx="4" fill="#111111" fillOpacity="0.14" />
-      <rect x="44" y="90" width="152" height="8" rx="4" fill="#111111" fillOpacity="0.14" />
-      <rect x="44" y="114" width="100" height="8" rx="4" fill="#111111" fillOpacity="0.14" />
-      <line x1="44" y1="146" x2="196" y2="146" stroke="#111111" strokeOpacity="0.14" strokeDasharray="4 6" />
-      <rect x="44" y="166" width="60" height="14" rx="7" fill="#111111" />
-      <g transform="rotate(-8 150 214)">
-        <rect x="96" y="192" width="108" height="40" rx="20" fill="none" stroke="#1b7a4b" strokeWidth="3" />
-        <path d="M114 212l7 7 12-14" fill="none" stroke="#1b7a4b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        <text x="142" y="217" fontSize="13" fontWeight="600" fill="#1b7a4b" fontFamily="system-ui, sans-serif">
-          Verified
-        </text>
-      </g>
-    </svg>
-  );
-}
-
 export default function MarketingHomePage() {
   return (
     <>
@@ -103,21 +94,21 @@ export default function MarketingHomePage() {
       </header>
 
       <main id="main">
-        <section className="mx-auto grid max-w-5xl gap-10 px-4 pb-16 pt-12 md:grid-cols-[1.2fr_1fr] md:items-center md:pt-20">
-          <div className="grid gap-6">
-            <h1 className="font-display text-[length:var(--text-display)] leading-[1.02] tracking-tight">
+        <section className="overflow-x-clip px-4 pb-16 pt-10 md:pt-14" aria-labelledby="hero-title">
+          <div className="mx-auto grid max-w-3xl justify-items-center gap-6 text-center">
+            <h1 id="hero-title" className="font-display text-[length:var(--text-display)] leading-[1.02] tracking-tight">
               Contribute on your own schedule, with a <em>receipt you can trust</em>.
             </h1>
             <p className="max-w-prose text-lg text-ink-muted">
               Make scheduled or one time contributions in naira. We confirm every payment with Paystack before we record it.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap justify-center gap-3">
               <LinkButton href="/register" size="lg" trailingIcon={<Arrow />}>Get started</LinkButton>
               <LinkButton href="#how-it-works" size="lg" variant="secondary">See how it works</LinkButton>
             </div>
           </div>
-          <div className="rounded-xl border border-ink/10 bg-surface p-6">
-            <ReceiptArt />
+          <div className="mt-10">
+            <HeroScene />
           </div>
         </section>
 
@@ -127,6 +118,24 @@ export default function MarketingHomePage() {
             {steps.map((s) => (
               <li key={s.n}>
                 <Card className="h-full">
+                  <div className="mb-4 h-48 overflow-hidden rounded-2xl" style={{ background: "#f5efe6" }}>
+                    <TiltScene maxTilt={9} className="grid h-full place-items-center">
+                      <Image
+                        src={s.art.src}
+                        width={s.art.width}
+                        height={s.art.height}
+                        alt=""
+                        className="depth h-36 w-auto max-w-[88%] object-contain"
+                        style={
+                          {
+                            "--z": "30px",
+                            WebkitMaskImage: "radial-gradient(ellipse at center, #000 58%, transparent 100%)",
+                            maskImage: "radial-gradient(ellipse at center, #000 58%, transparent 100%)",
+                          } as CSSProperties
+                        }
+                      />
+                    </TiltScene>
+                  </div>
                   <span className="mb-4 grid h-10 w-10 place-items-center rounded-full bg-ink text-ink-inverse" aria-hidden="true">{s.n}</span>
                   <h3 className="mb-2 text-xl font-semibold">{s.title}</h3>
                   <p className="text-ink-muted">{s.body}</p>
@@ -168,7 +177,19 @@ export default function MarketingHomePage() {
         </section>
 
         <section id="faq" className="mx-auto grid max-w-3xl gap-6 px-4 py-16 scroll-mt-24" aria-labelledby="faq-title">
-          <h2 id="faq-title" className="font-display text-4xl leading-tight">Questions</h2>
+          <div className="flex items-end justify-between gap-6">
+            <h2 id="faq-title" className="font-display text-4xl leading-tight">Questions</h2>
+            <TiltScene maxTilt={10}>
+              <Image
+                src="/illustrations/empty-payments.webp"
+                width={410}
+                height={478}
+                alt=""
+                className="depth h-32 w-auto md:h-40"
+                style={{ "--z": "30px" } as CSSProperties}
+              />
+            </TiltScene>
+          </div>
           <div className="grid gap-3">
             {faqs.map((f) => (
               <details key={f.q} className="group rounded-lg border border-ink/10 bg-surface px-5 py-4">
