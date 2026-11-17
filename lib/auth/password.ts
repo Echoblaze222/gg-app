@@ -7,13 +7,19 @@ const COMMON = new Set([
 
 const SEQUENCES = ["abcdefghijklmnopqrstuvwxyz", "0123456789", "qwertyuiopasdfghjklzxcvbnm"];
 
+/** The provider hashes with bcrypt, which only uses the first 72 bytes, and refuses longer passwords. */
+const MAX_BYTES = 72;
+const MIN_CHARS = 10;
+
 function isSequence(p: string): boolean {
   return SEQUENCES.some((s) => s.includes(p) || [...s].reverse().join("").includes(p));
 }
 
 /** Local strength check. Not a breached password lookup (see docs/security/04-auth-service-spec.md). */
 export function isPasswordAcceptable(password: string, who: { email: string; fullName: string }): boolean {
-  if (password.length < 10 || password.length > 128) return false;
+  if (password.length < MIN_CHARS) return false;
+  // Bytes, not characters: non-ASCII characters take two or more bytes.
+  if (new TextEncoder().encode(password).length > MAX_BYTES) return false;
   const lower = password.toLowerCase();
   if (COMMON.has(lower)) return false;
   if (/^(.)\1+$/.test(lower)) return false;
