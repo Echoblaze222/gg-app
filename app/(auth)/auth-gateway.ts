@@ -1,19 +1,31 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { AuthService, RequestContext } from "@/contracts/services";
 import type { Uuid } from "@/contracts/entities";
+import { AuthConfigError, authLogger, composeAuth, readCurrentPolicyIds } from "@/lib/auth/composition";
 
 /**
  * The one place the auth screens reach the server side services.
  *
- * AI-2 owns the real AuthService (lib/auth, createAuthService) but the app does not yet have a composition root that
- * builds it with a database, a session store and cookies. Until it does, both getters return nothing and every form
- * shows the SYSTEM_UNAVAILABLE message instead of pretending to work. Wiring it later is a change in this file only.
+ * getAuthService builds the real AuthService for this request (lib/auth/composition.ts). When a setting is missing or
+ * the database cannot be reached it returns null, and every form then shows the SYSTEM_UNAVAILABLE message with a
+ * reference number instead of pretending to work. It never returns a fake service.
  */
 
-export function getAuthService(): AuthService | null {
-  return null;
+function logUnavailable(where: string, err: unknown): void {
+  // Config errors name only the missing variable. Anything else logs its class name, never its message.
+  authLogger.error(`${where}_unavailable`, err instanceof AuthConfigError ? err.message : err instanceof Error ? err.name : "unknown");
+}
+
+/** Call from server actions and route handlers: it can set the session cookies. */
+export async function getAuthService(): Promise<AuthService | null> {
+  try {
+    return composeAuth({ cookieStore: await cookies(), writable: true }).auth;
+  } catch (err) {
+    logUnavailable("auth_service", err);
+    return null;
+  }
 }
 
 /**
@@ -25,9 +37,14 @@ export async function getGoogleAuthUrl(ctx: RequestContext): Promise<string | nu
   return null;
 }
 
-/** Ids of the policy versions a new member accepts. Read on the server so the browser can never choose them. */
+/** Ids of the policy versions a new member accepts. Read on the server so the browser can never choose them. Empty until terms and privacy are published. */
 export async function getCurrentPolicyVersionIds(): Promise<Uuid[]> {
-  return [];
+  try {
+    return await readCurrentPolicyIds();
+  } catch (err) {
+    logUnavailable("policy_lookup", err);
+    return [];
+  }
 }
 
 export async function buildRequestContext(): Promise<RequestContext> {
