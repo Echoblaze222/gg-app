@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Turntable } from "@/components/motion/Turntable";
+import { OrbitObjects } from "./OrbitObjects";
 
 const SHEET = "/illustrations/pig-360.webp";
 const POSTER = "/illustrations/pig-poster.webp";
@@ -39,7 +40,9 @@ export function HeroArt() {
         poster={POSTER}
         startYaw={-0.55}
         label="Glass piggy bank full of gold coins"
-      />
+      >
+        <OrbitObjects />
+      </Turntable>
     );
   }
 
