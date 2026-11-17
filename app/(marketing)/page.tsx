@@ -118,16 +118,24 @@ export default function MarketingHomePage() {
             {steps.map((s) => (
               <li key={s.n}>
                 <Card className="h-full">
-                  <TiltScene maxTilt={9} className="mb-4 grid h-44 place-items-center">
-                    <Image
-                      src={s.art.src}
-                      width={s.art.width}
-                      height={s.art.height}
-                      alt=""
-                      className="depth h-44 w-auto max-w-full object-contain"
-                      style={{ "--z": "30px" } as CSSProperties}
-                    />
-                  </TiltScene>
+                  <div className="mb-4 h-48 overflow-hidden rounded-2xl" style={{ background: "#f5efe6" }}>
+                    <TiltScene maxTilt={9} className="grid h-full place-items-center">
+                      <Image
+                        src={s.art.src}
+                        width={s.art.width}
+                        height={s.art.height}
+                        alt=""
+                        className="depth h-36 w-auto max-w-[88%] object-contain"
+                        style={
+                          {
+                            "--z": "30px",
+                            WebkitMaskImage: "radial-gradient(ellipse at center, #000 58%, transparent 100%)",
+                            maskImage: "radial-gradient(ellipse at center, #000 58%, transparent 100%)",
+                          } as CSSProperties
+                        }
+                      />
+                    </TiltScene>
+                  </div>
                   <span className="mb-4 grid h-10 w-10 place-items-center rounded-full bg-ink text-ink-inverse" aria-hidden="true">{s.n}</span>
                   <h3 className="mb-2 text-xl font-semibold">{s.title}</h3>
                   <p className="text-ink-muted">{s.body}</p>
