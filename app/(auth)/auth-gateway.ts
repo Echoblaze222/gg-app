@@ -16,6 +16,15 @@ export function getAuthService(): AuthService | null {
   return null;
 }
 
+/**
+ * Where to send the browser to start Google sign in or sign up, or null while that is not wired.
+ * The same path serves both: Google tells us whether the account is new. Needs an OAuth route from AI-2 (routes.md lists it).
+ */
+export async function getGoogleAuthUrl(ctx: RequestContext): Promise<string | null> {
+  void ctx;
+  return null;
+}
+
 /** Ids of the policy versions a new member accepts. Read on the server so the browser can never choose them. */
 export async function getCurrentPolicyVersionIds(): Promise<Uuid[]> {
   return [];

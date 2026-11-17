@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { AppError } from "@/contracts/errors";
-import { loginInputSchema, registerInputSchema } from "@/contracts/schemas";
-import { buildRequestContext, getAuthService, getCurrentPolicyVersionIds } from "./auth-gateway";
+import { emailSchema, loginInputSchema, otpSchema, passwordSchema, registerInputSchema } from "@/contracts/schemas";
+import { buildRequestContext, getAuthService, getCurrentPolicyVersionIds, getGoogleAuthUrl } from "./auth-gateway";
 import { fieldErrorsFromIssues, stateFromError, validationState, type AuthFormState } from "./form-state";
 
 const text = (data: FormData, key: string) => {
@@ -14,7 +14,7 @@ const text = (data: FormData, key: string) => {
 const attemptOf = (prev: AuthFormState) => (prev.status === "error" ? prev.attempt + 1 : 1);
 
 const LOGIN_FRIENDLY = {
-  identifier: "Enter your email address or phone number.",
+  identifier: "Enter the email address you signed up with.",
   password: "Enter your password.",
 };
 
@@ -69,4 +69,65 @@ export async function registerAction(prev: AuthFormState, formData: FormData): P
       ? `We sent a verification message to ${parsed.data.email}. Open it to confirm your account.`
       : "Your account was created. Verification could not be sent yet, so sign in later or ask for a new message.",
   };
+}
+
+const unavailable = async (attempt: number) => {
+  const ctx = await buildRequestContext();
+  return stateFromError(new AppError("SYSTEM_UNAVAILABLE", { reference: ctx.requestId }).toShape(), attempt);
+};
+
+export async function googleAction(prev: AuthFormState): Promise<AuthFormState> {
+  const attempt = attemptOf(prev);
+  const ctx = await buildRequestContext();
+  const url = await getGoogleAuthUrl(ctx);
+  if (!url) return unavailable(attempt);
+  redirect(url);
+}
+
+export async function forgotPasswordAction(prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const attempt = attemptOf(prev);
+  const email = emailSchema.safeParse(text(formData, "email"));
+  if (!email.success) return validationState({ email: "Enter the email address you signed up with." }, attempt);
+
+  const ctx = await buildRequestContext();
+  const auth = getAuthService();
+  if (!auth) return unavailable(attempt);
+
+  const result = await auth.requestPasswordReset(ctx, { identifier: email.data });
+  if (!result.ok) return stateFromError(result.error, attempt);
+  // Same words whether or not an account exists, so this form cannot be used to find out who has one.
+  return { status: "success", message: `If an account exists for ${email.data}, we sent a link to reset the password. It can take a few minutes.` };
+}
+
+export async function resetPasswordAction(prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const attempt = attemptOf(prev);
+  const token = text(formData, "token");
+  const password = passwordSchema.safeParse(text(formData, "password"));
+  const fields: Record<string, string> = {};
+  if (!password.success) fields.password = "Use at least 10 characters.";
+  else if (text(formData, "confirm") !== password.data) fields.confirm = "The passwords do not match.";
+  if (Object.keys(fields).length > 0) return validationState(fields, attempt);
+  if (!password.success) return validationState(fields, attempt);
+
+  const ctx = await buildRequestContext();
+  const auth = getAuthService();
+  if (!auth) return unavailable(attempt);
+
+  const result = await auth.resetPassword(ctx, { token, newPassword: password.data });
+  if (!result.ok) return stateFromError(result.error, attempt);
+  return { status: "success", message: "Your password was changed and you were signed out everywhere. Log in with the new password." };
+}
+
+export async function mfaAction(prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const attempt = attemptOf(prev);
+  const code = otpSchema.safeParse(text(formData, "code").replace(/\s/g, ""));
+  if (!code.success) return validationState({ code: "Enter the 6 digit code." }, attempt);
+
+  const ctx = await buildRequestContext();
+  const auth = getAuthService();
+  if (!auth) return unavailable(attempt);
+
+  const result = await auth.verifyMfa(ctx, { code: code.data });
+  if (!result.ok) return stateFromError(result.error, attempt);
+  redirect("/app");
 }
