@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { SbAdmin } from "./supabase-like";
 import { IdentityProviderError } from "./supabase-identity";
 import type { ReauthDb } from "./reauth-store";
@@ -7,6 +7,8 @@ import type { DeviceDb } from "./device-gate";
 
 export interface SupabaseAdmin {
   admin: SbAdmin;
+  /** The service role client itself, for the repositories in lib/db. Never pass it to a client component. */
+  client: SupabaseClient;
   revokeAllSessions(userId: string): Promise<void>;
   /** public.session_reauth, service role only. */
   reauthDb: ReauthDb;
@@ -27,6 +29,7 @@ export function createSupabaseAdmin(): SupabaseAdmin {
 
   return {
     admin: client.auth.admin,
+    client,
     async revokeAllSessions(userId: string) {
       // SQL function, service_role only (spec problem 2). Deletes the user's auth.sessions rows.
       const { error } = await client.rpc("revoke_all_sessions", { target_user_id: userId });

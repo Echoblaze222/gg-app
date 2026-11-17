@@ -31,7 +31,7 @@ export async function loginAction(prev: AuthFormState, formData: FormData): Prom
   if (!parsed.success) return validationState(fieldErrorsFromIssues(parsed.error.issues, LOGIN_FRIENDLY), attempt);
 
   const ctx = await buildRequestContext();
-  const auth = getAuthService();
+  const auth = await getAuthService();
   if (!auth) return stateFromError(new AppError("SYSTEM_UNAVAILABLE", { reference: ctx.requestId }).toShape(), attempt);
 
   const result = await auth.login(ctx, parsed.data);
@@ -56,7 +56,7 @@ export async function registerAction(prev: AuthFormState, formData: FormData): P
   if (Object.keys(fields).length > 0 || !parsed.success) return validationState(fields, attempt);
 
   const ctx = await buildRequestContext();
-  const auth = getAuthService();
+  const auth = await getAuthService();
   if (!auth || policyIds.length === 0) {
     return stateFromError(new AppError("SYSTEM_UNAVAILABLE", { reference: ctx.requestId }).toShape(), attempt);
   }
@@ -90,7 +90,7 @@ export async function forgotPasswordAction(prev: AuthFormState, formData: FormDa
   if (!email.success) return validationState({ email: "Enter the email address you signed up with." }, attempt);
 
   const ctx = await buildRequestContext();
-  const auth = getAuthService();
+  const auth = await getAuthService();
   if (!auth) return unavailable(attempt);
 
   const result = await auth.requestPasswordReset(ctx, { identifier: email.data });
@@ -110,7 +110,7 @@ export async function resetPasswordAction(prev: AuthFormState, formData: FormDat
   if (!password.success) return validationState(fields, attempt);
 
   const ctx = await buildRequestContext();
-  const auth = getAuthService();
+  const auth = await getAuthService();
   if (!auth) return unavailable(attempt);
 
   const result = await auth.resetPassword(ctx, { token, newPassword: password.data });
@@ -124,7 +124,7 @@ export async function mfaAction(prev: AuthFormState, formData: FormData): Promis
   if (!code.success) return validationState({ code: "Enter the 6 digit code." }, attempt);
 
   const ctx = await buildRequestContext();
-  const auth = getAuthService();
+  const auth = await getAuthService();
   if (!auth) return unavailable(attempt);
 
   const result = await auth.verifyMfa(ctx, { code: code.data });
