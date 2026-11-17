@@ -149,6 +149,36 @@
     font-size: var(--text-sm);
   }
 
+  .auth__social {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .auth__divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    color: var(--color-ink-muted);
+    font-size: var(--text-sm);
+  }
+
+  .auth__divider::before,
+  .auth__divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: color-mix(in srgb, var(--color-ink) 15%, transparent);
+  }
+
+  .auth__google {
+    width: 100%;
+  }
+
+  .auth__otp .field__input {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.4em;
+  }
+
   .auth :where(a, button, input):focus-visible {
     outline: 3px solid var(--color-focus-ring);
     outline-offset: 2px;

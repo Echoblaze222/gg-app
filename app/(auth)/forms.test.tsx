@@ -3,6 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
+import { GoogleSection } from "./GoogleButton";
+import { ForgotPasswordForm } from "./ForgotPasswordForm";
+import { ResetPasswordForm } from "./ResetPasswordForm";
+import { MfaForm } from "./MfaForm";
 import type { AuthFormState } from "./form-state";
 
 afterEach(cleanup);
@@ -10,7 +14,7 @@ afterEach(cleanup);
 describe("LoginForm", () => {
   it("has labelled fields and a Log in button", () => {
     render(<LoginForm action={async () => ({ status: "idle" })} />);
-    expect(screen.getByLabelText("Email or phone number")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
     expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/forgot-password");
@@ -36,13 +40,13 @@ describe("LoginForm", () => {
       attempt: 1,
     }));
     render(<LoginForm action={action} />);
-    await user.type(screen.getByLabelText("Email or phone number"), "ada@example.com");
+    await user.type(screen.getByLabelText("Email"), "ada@example.com");
     await user.type(screen.getByLabelText("Password"), "nope");
     await user.click(screen.getByRole("button", { name: "Log in" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("not correct");
     expect(alert).toHaveTextContent("req-77");
-    await waitFor(() => expect(screen.getByLabelText("Email or phone number")).toHaveAttribute("aria-invalid", "true"));
+    await waitFor(() => expect(screen.getByLabelText("Email")).toHaveAttribute("aria-invalid", "true"));
   });
 });
 
@@ -63,5 +67,52 @@ describe("RegisterForm", () => {
     await user.click(screen.getByRole("button", { name: "Sign up" }));
     expect(await screen.findByText("Check your email")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to log in" })).toHaveAttribute("href", "/login");
+  });
+});
+
+describe("GoogleSection", () => {
+  it("offers Continue with Google and shows the server's error in an alert", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(async (): Promise<AuthFormState> => ({ status: "error", message: "The service is temporarily unavailable.", reference: "req-g", fields: {}, attempt: 1 }));
+    render(<GoogleSection action={action} />);
+    await user.click(screen.getByRole("button", { name: "Continue with Google" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("req-g");
+  });
+});
+
+describe("ForgotPasswordForm", () => {
+  it("shows the server's message after the request and a way back", async () => {
+    const user = userEvent.setup();
+    render(<ForgotPasswordForm action={async () => ({ status: "success", message: "If an account exists for ada@example.com, we sent a link." })} />);
+    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+    expect(await screen.findByText("Check your email")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to log in" })).toHaveAttribute("href", "/login");
+  });
+});
+
+describe("ResetPasswordForm", () => {
+  it("sends the token in a hidden field and has two password fields", () => {
+    const { container } = render(<ResetPasswordForm action={async () => ({ status: "idle" })} token="tok-1" />);
+    expect(container.querySelector('input[name="token"]')).toHaveAttribute("value", "tok-1");
+    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "password");
+  });
+
+  it("offers a new link when the server says the link is no good", async () => {
+    const user = userEvent.setup();
+    render(<ResetPasswordForm token="old" action={async () => ({ status: "error", message: "This reset link has expired or was already used.", fields: {}, attempt: 1 })} />);
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+    expect(await screen.findByRole("link", { name: "Ask for a new link" })).toHaveAttribute("href", "/forgot-password");
+  });
+});
+
+describe("MfaForm", () => {
+  it("is a numeric one time code field that the phone can autofill", () => {
+    render(<MfaForm action={async () => ({ status: "idle" })} />);
+    const field = screen.getByLabelText("6 digit code");
+    expect(field).toHaveAttribute("autocomplete", "one-time-code");
+    expect(field).toHaveAttribute("inputmode", "numeric");
+    expect(field).toHaveAttribute("maxlength", "6");
   });
 });
