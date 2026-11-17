@@ -26,34 +26,51 @@ function decodeClaims(token: string): Record<string, unknown> | null {
 /** A 4xx from the Auth server means the token is not good. Anything else (5xx, no status, 429) is an outage. */
 const isRejection = (status: number | undefined) => typeof status === "number" && status >= 400 && status < 500 && status !== 429;
 
+export interface VerifiedSession {
+  /** The user id the Auth server confirmed. */
+  userId: string;
+  sessionId: string;
+  /** Authenticator assurance level claim of the confirmed token. */
+  aal: unknown;
+}
+
+/**
+ * Reads the cookie session, asks the Auth server about exactly that token, and only then reads claims from it.
+ * Returns null when there is no good session. Throws IdentityProviderError on an outage. Never refreshes or
+ * writes cookies, so it is safe to call from a Server Component.
+ */
+export async function readVerifiedSession(auth: SbAuth): Promise<VerifiedSession | null> {
+  const cookie = await auth.getSession();
+  if (cookie.error) throw new IdentityProviderError("resolve", cookie.error.code);
+  if (!cookie.data.session) return null;
+  const token = cookie.data.session.access_token;
+
+  // This is what notices a revoked session: the Auth server checks the session still exists.
+  const { data, error } = await auth.getUser(token);
+  if (error) {
+    if (isRejection(error.status)) return null;
+    throw new IdentityProviderError("resolve", error.code);
+  }
+  const verified = data.user;
+  if (!verified) return null;
+
+  // Claims come from the same token. Identity comes from the verified user, and the two must agree.
+  const claims = decodeClaims(token);
+  if (!claims || claims.sub !== verified.id) return null;
+  const sessionId = typeof claims.session_id === "string" && claims.session_id.length > 0 ? claims.session_id : null;
+  if (!sessionId) return null;
+  return { userId: verified.id, sessionId, aal: claims.aal };
+}
+
 export function createSessionResolver(deps: SessionResolverDeps): SessionResolver {
   return {
     async resolve(): Promise<SessionFacts | null> {
       try {
-        const cookie = await deps.auth.getSession();
-        if (cookie.error) throw new IdentityProviderError("resolve", cookie.error.code);
-        if (!cookie.data.session) return null;
-        const token = cookie.data.session.access_token;
-
-        // Ask the Auth server about exactly this token. This is what notices a revoked session.
-        const { data, error } = await deps.auth.getUser(token);
-        if (error) {
-          if (isRejection(error.status)) return null;
-          throw new IdentityProviderError("resolve", error.code);
-        }
-        const verified = data.user;
-        if (!verified) return null;
-
-        // Claims come from the same token. Identity comes from the verified user, and the two must agree.
-        const claims = decodeClaims(token);
-        if (!claims || claims.sub !== verified.id) return null;
-        const sessionId = typeof claims.session_id === "string" && claims.session_id.length > 0 ? claims.session_id : null;
-        if (!sessionId) return null;
-
-        if (await deps.devices.isRevoked(verified.id, sessionId)) return null;
-        const recentlyReauthenticated = await deps.reauth.isRecent(sessionId, verified.id);
-
-        return { memberId: verified.id, sessionId, mfaVerified: claims.aal === "aal2", recentlyReauthenticated };
+        const session = await readVerifiedSession(deps.auth);
+        if (!session) return null;
+        if (await deps.devices.isRevoked(session.userId, session.sessionId)) return null;
+        const recentlyReauthenticated = await deps.reauth.isRecent(session.sessionId, session.userId);
+        return { memberId: session.userId, sessionId: session.sessionId, mfaVerified: session.aal === "aal2", recentlyReauthenticated };
       } catch (e) {
         if (e instanceof IdentityProviderError) throw e;
         deps.logger.error("identity.resolve_failed", { name: e instanceof Error ? e.name : "unknown" });
