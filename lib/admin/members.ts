@@ -111,13 +111,13 @@ export function createAdminMemberService(deps: AdminMemberServiceDeps): AdminMem
       });
     },
 
-    get(ctx, memberId) {
+    get(ctx, input) {
       return guard<Member>(ctx, async () => {
         const session = await deps.authorization.requirePermission(ctx, "admin.members.read");
         if (!session.ok) {
           return session;
         }
-        const parsed = getMemberInputSchema.safeParse({ memberId });
+        const parsed = getMemberInputSchema.safeParse(input);
         if (!parsed.success) {
           return fail("VALIDATION_FAILED", ctx.requestId, fieldsFromZod(parsed.error));
         }

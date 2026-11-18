@@ -154,6 +154,9 @@ describe("get", () => {
     const h = harness();
     const result = await h.service.get(ctx, { memberId: "abc" });
     expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_FAILED");
+    }
     expect(h.getById).not.toHaveBeenCalled();
   });
 
