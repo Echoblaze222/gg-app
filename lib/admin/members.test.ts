@@ -134,7 +134,7 @@ describe("list", () => {
 describe("get", () => {
   it("returns the member and records that staff viewed it", async () => {
     const h = harness();
-    const result = await h.service.get(ctx, TARGET);
+    const result = await h.service.get(ctx, { memberId: TARGET });
     expect(result.ok).toBe(true);
     expect(h.requirePermission).toHaveBeenCalledWith(ctx, "admin.members.read");
     expect(h.record).toHaveBeenCalledWith(ctx, expect.objectContaining({ action: "admin.member.view", targetId: TARGET, result: "success" }));
@@ -142,7 +142,7 @@ describe("get", () => {
 
   it("returns NOT_FOUND for an unknown member and records nothing", async () => {
     const h = harness();
-    const result = await h.service.get(ctx, UNKNOWN);
+    const result = await h.service.get(ctx, { memberId: UNKNOWN });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("NOT_FOUND");
@@ -152,14 +152,17 @@ describe("get", () => {
 
   it("rejects an id that is not a uuid before touching the repository", async () => {
     const h = harness();
-    const result = await h.service.get(ctx, "abc");
+    const result = await h.service.get(ctx, { memberId: "abc" });
     expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_FAILED");
+    }
     expect(h.getById).not.toHaveBeenCalled();
   });
 
   it("blocks before the repository when permission is denied", async () => {
     const h = harness({ auth: denied() });
-    const result = await h.service.get(ctx, TARGET);
+    const result = await h.service.get(ctx, { memberId: TARGET });
     expect(result.ok).toBe(false);
     expect(h.getById).not.toHaveBeenCalled();
   });
@@ -167,7 +170,7 @@ describe("get", () => {
   it("still returns the member when the audit write fails, and reports it", async () => {
     const h = harness();
     h.record.mockRejectedValueOnce(new Error("audit down"));
-    const result = await h.service.get(ctx, TARGET);
+    const result = await h.service.get(ctx, { memberId: TARGET });
     expect(result.ok).toBe(true);
     expect(h.onUnexpectedError).toHaveBeenCalledTimes(1);
   });
