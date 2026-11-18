@@ -198,7 +198,8 @@ export async function createMember(opts: SeedMemberOptions = {}): Promise<string
     JSON.stringify({ full_name: opts.name ?? "Test Member" }),
   ]);
   const status = opts.status ?? "active";
-  if (status !== "pending_verification") await q("update members set status = $2 where id = $1", [id, status]);
+  // Migration 2001 activates a member as soon as their email is confirmed, so the requested status is always applied.
+  if (status !== "active") await q("update members set status = $2 where id = $1", [id, status]);
   return id;
 }
 
