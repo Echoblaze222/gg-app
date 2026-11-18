@@ -1,0 +1,103 @@
+# Save this file in the repo as: .github/workflows/ci.yml
+# Integrator CI. Runs on every pull request and on pushes to main and integration.
+# Blocking checks: install from the lockfile, lint, type check, unit and contract tests.
+# Non blocking for now: dependency audit and production build (they report, they do not block).
+# Database tests (npm run test:db) run in the `database` job against a disposable PostgreSQL service container.
+# End to end tests (npm run test:e2e) are added later.
+# Action versions are pinned to major tags. Pin to commit SHAs before production.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, integration]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, type check, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install from lockfile
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit and contract tests
+        run: npm test
+
+  database:
+    name: Database tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Local service container only. The test helpers refuse any non local host.
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/gg_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Database tests
+        run: npm run test:db
+
+  audit:
+    name: Dependency audit (non blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+
+  build:
+    name: Production build (non blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    env:
+      APP_ENV: test
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-not-a-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
