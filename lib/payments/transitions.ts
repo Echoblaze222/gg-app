@@ -79,3 +79,33 @@ export function isLegalPaymentPath(from: PaymentAttemptStatus, path: readonly Pa
   }
   return true;
 }
+
+/**
+ * The ordered compare and set steps needed to mark an obligation paid.
+ * The contract has no direct `scheduled` to `paid` edge, so a payment made before the due date passes through `due`.
+ * An empty path means it is already paid. Null means it cannot be paid (cancelled).
+ */
+export function pathToPaid(from: ObligationStatus): readonly ObligationStatus[] | null {
+  switch (from) {
+    case "scheduled":
+      return ["due", "paid"];
+    case "due":
+    case "missed":
+      return ["paid"];
+    case "paid":
+      return [];
+    default:
+      return null;
+  }
+}
+
+/** True when every step in the obligation path is an allowed edge, starting at `from`. */
+export function isLegalObligationPath(from: ObligationStatus, path: readonly ObligationStatus[]): boolean {
+  let current = from;
+  for (const next of path) {
+    if (!canObligationTransition(current, next)) return false;
+    current = next;
+  }
+  return true;
+}
+
