@@ -16,6 +16,9 @@ const PAYOUTS = { requested: 1, verified: 2, approved: 3, processing: 4, paid: 1
 const STUCK = { initiating: 1, awaiting_authentication: 20, processing: 2, verifying: 3, successful: 0, failed: 0, cancelled: 0, expired: 0, reversed: 0 };
 const TICKETS = { open: 3, pending_member: 4, pending_staff: 2, resolved: 9, closed: 8 };
 
+type SectionName = "payouts" | "payments" | "reconciliation" | "support";
+const SECTION_NAMES: readonly SectionName[] = ["payouts", "payments", "reconciliation", "support"];
+
 function denied(): Result<SessionInfo> {
   return { ok: false, error: new AppError("PERMISSION_DENIED", { reference: "req-1" }).toShape() };
 }
@@ -25,6 +28,11 @@ function unwrap<T>(result: Result<T>): T {
     throw new Error(`expected ok, got ${result.error.code}`);
   }
   return result.value;
+}
+
+/** `undefined` means "use the default". `null` is a real value, so a test can make the repository return null. */
+function pick(value: unknown, fallback: unknown): unknown {
+  return value === undefined ? fallback : value;
 }
 
 function harness(
@@ -48,10 +56,10 @@ function harness(
     return allowed.has(permission) ? { ok: true, value: session } : denied();
   });
   const authorization = { requirePermission } as unknown as AuthorizationService;
-  const countPayoutsByStatus = vi.fn(async () => opts.payouts ?? PAYOUTS);
-  const countAttemptsByStatus = vi.fn(async (_input: { olderThanSeconds?: number }) => opts.attempts ?? STUCK);
-  const countOpenReconciliationRecords = vi.fn(async () => (opts.reconciliation === undefined ? 5 : opts.reconciliation));
-  const countTicketsByStatus = vi.fn(async () => opts.tickets ?? TICKETS);
+  const countPayoutsByStatus = vi.fn(async () => pick(opts.payouts, PAYOUTS));
+  const countAttemptsByStatus = vi.fn(async (_input: { olderThanSeconds?: number }) => pick(opts.attempts, STUCK));
+  const countOpenReconciliationRecords = vi.fn(async () => pick(opts.reconciliation, 5));
+  const countTicketsByStatus = vi.fn(async () => pick(opts.tickets, TICKETS));
   const counts = { countPayoutsByStatus, countAttemptsByStatus, countOpenReconciliationRecords, countTicketsByStatus } as unknown as AdminCountsRepository;
   const onSectionError = vi.fn();
   const onUnexpectedError = vi.fn();
@@ -172,15 +180,14 @@ describe("numbers", () => {
     ["a missing record", { tickets: null }, "support"],
     ["a negative reconciliation count", { reconciliation: -2 }, "reconciliation"],
     ["a reconciliation count that is not a number", { reconciliation: "5" }, "reconciliation"],
-  ])("marks only that section unavailable for %s", async (_label, opts, section) => {
+  ] as const)("marks only that section unavailable for %s", async (_label, opts, section) => {
     const h = harness(opts);
     const summary = unwrap(await h.service.getSummary(ctx));
-    expect(summary[section as "payouts" | "payments" | "reconciliation" | "support"]).toEqual({ state: "unavailable" });
+    expect(summary[section]).toEqual({ state: "unavailable" });
     expect(h.onSectionError).toHaveBeenCalledTimes(1);
     expect(h.onSectionError.mock.calls[0]?.[0]).toBe(section);
     expect(summary.attentionTotal).toBeNull();
-    const others = ("payouts payments reconciliation support".split(" ") as Array<"payouts" | "payments" | "reconciliation" | "support">).filter((name) => name !== section);
-    for (const name of others) {
+    for (const name of SECTION_NAMES.filter((other) => other !== section)) {
       expect(summary[name]?.state).toBe("ready");
     }
   });

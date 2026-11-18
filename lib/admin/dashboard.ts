@@ -161,7 +161,8 @@ async function loadPayouts(counts: AdminCountsRepository): Promise<PayoutsSummar
 }
 
 async function loadReconciliation(counts: AdminCountsRepository): Promise<ReconciliationSummary | null> {
-  const open = await counts.countOpenReconciliationRecords();
+  // Typed unknown on purpose: the check below is the guard against a repository that returns something else.
+  const open: unknown = await counts.countOpenReconciliationRecords();
   if (typeof open !== "number" || !Number.isSafeInteger(open) || open < 0) {
     return null;
   }
