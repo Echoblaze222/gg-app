@@ -25,6 +25,7 @@ exist and the shim changes nothing.
 | `refunds.test.ts` | Refund eligibility and cap, lifecycle, ledger debit, balance check at completion. |
 | `rls.test.ts` | I8 and I10 as each real role: own rows only, no money writes, no self promotion, server role limits. |
 | `bootstrap.test.ts` | Signup creates profile, ledger anchor and role atomically. Single owner. `has_permission`. |
+| `limits.test.ts` | ADR-014: 500,000 naira savings cap per member, in flight attempts counted, forced concurrent attempts, a missing cap blocks, `admin.limits.update` is owner only. |
 | `append-only.test.ts` | Audit log and security events cannot be changed. Step up challenges store hashes only. |
 
 Two `it.todo` entries mark a known gap: a payment that moves to `reversed` does not take its credit back out of the ledger.

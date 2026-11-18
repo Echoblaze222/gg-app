@@ -28,7 +28,8 @@ describe("D12: a new auth user gets everything in one transaction", () => {
       "select email, full_name, status, email_verified_at from members where id = $1",
       [id],
     );
-    expect(member).toMatchObject({ email: "ada@example.ng", full_name: "Ada Lovelace", status: "pending_verification" });
+    // Already confirmed by the identity provider, so migration 2001 activates the member in the same transaction.
+    expect(member).toMatchObject({ email: "ada@example.ng", full_name: "Ada Lovelace", status: "active" });
     expect(member.email_verified_at).not.toBeNull();
     expect((await q("select 1 from ledger_accounts where member_id = $1", [id])).length).toBe(1);
     const roles = await q<{ role: string }>("select role from member_roles where member_id = $1", [id]);
@@ -38,7 +39,26 @@ describe("D12: a new auth user gets everything in one transaction", () => {
   it("an unconfirmed email stays unverified", async () => {
     const id = randomUUID();
     await q("insert into auth.users (id, email) values ($1, 'unverified@example.ng')", [id]);
-    expect((await one<{ email_verified_at: Date | null }>("select email_verified_at from members where id = $1", [id])).email_verified_at).toBeNull();
+    const row = await one<{ email_verified_at: Date | null; status: string }>("select email_verified_at, status from members where id = $1", [id]);
+    expect(row.email_verified_at).toBeNull();
+    expect(row.status).toBe("pending_verification");
+  });
+
+  it("confirming the email later activates a pending member (migration 2001)", async () => {
+    const id = randomUUID();
+    await q("insert into auth.users (id, email) values ($1, 'later@example.ng')", [id]);
+    await q("update auth.users set email_confirmed_at = now() where id = $1", [id]);
+    const row = await one<{ email_verified_at: Date | null; status: string }>("select email_verified_at, status from members where id = $1", [id]);
+    expect(row.status).toBe("active");
+    expect(row.email_verified_at).not.toBeNull();
+  });
+
+  it.each(["suspended", "closed"] as const)("confirming an email never reactivates a %s member", async (status) => {
+    const id = randomUUID();
+    await q("insert into auth.users (id, email) values ($1, $2)", [id, `${status}@example.ng`]);
+    await q("update members set status = $2 where id = $1", [id, status]);
+    await q("update auth.users set email_confirmed_at = now() where id = $1", [id]);
+    expect((await one<{ status: string }>("select status from members where id = $1", [id])).status).toBe(status);
   });
 
   it("falls back to the part of the email before the @ when no name is given", async () => {
