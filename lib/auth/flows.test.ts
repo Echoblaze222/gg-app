@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { confirmEmailToken, confirmTotpEnrolment, startTotpEnrolment } from "./flows";
 import type { SbAuthExtras } from "./supabase-extras";
 
-function fake(overrides: Partial<SbAuthExtras> & { mfa?: Partial<SbAuthExtras["mfa"]> } = {}) {
+function fake(overrides: Partial<Omit<SbAuthExtras, "mfa">> & { mfa?: Partial<SbAuthExtras["mfa"]> } = {}) {
   const auth = {
     verifyOtp: vi.fn().mockResolvedValue({ data: { session: null, user: { id: "u1" } }, error: null }),
     signOut: vi.fn().mockResolvedValue({ error: null }),
