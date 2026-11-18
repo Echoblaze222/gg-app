@@ -34,7 +34,7 @@ export function ResetPasswordForm({ action, token }: ResetPasswordFormProps) {
       <PasswordField label="New password" name="password" autoComplete="new-password" required hint="At least 10 characters." error={fields.password} />
       <PasswordField label="Confirm new password" name="confirm" autoComplete="new-password" required error={fields.confirm} />
       <div className="auth__row auth__row--end">
-        <Button type="submit" size="lg" variant="accent" status={pending ? "loading" : "idle"} loadingLabel="Changing the password">
+        <Button type="submit" size="lg" variant="primary" status={pending ? "loading" : "idle"} loadingLabel="Changing the password">
           Change password
         </Button>
       </div>

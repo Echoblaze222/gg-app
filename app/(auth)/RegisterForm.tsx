@@ -59,7 +59,7 @@ export function RegisterForm({ action }: RegisterFormProps) {
       </div>
 
       <div className="auth__row auth__row--end">
-        <Button type="submit" size="lg" variant="accent" status={pending ? "loading" : "idle"} loadingLabel="Creating your account" trailingIcon={<DoorIcon />}>
+        <Button type="submit" size="lg" variant="primary" status={pending ? "loading" : "idle"} loadingLabel="Creating your account" trailingIcon={<DoorIcon />}>
           Sign up
         </Button>
       </div>

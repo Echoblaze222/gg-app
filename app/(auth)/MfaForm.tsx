@@ -28,7 +28,7 @@ export function MfaForm({ action }: MfaFormProps) {
         error={fields.code}
       />
       <div className="auth__row auth__row--end">
-        <Button type="submit" size="lg" variant="accent" status={pending ? "loading" : "idle"} loadingLabel="Checking the code">
+        <Button type="submit" size="lg" variant="primary" status={pending ? "loading" : "idle"} loadingLabel="Checking the code">
           Verify
         </Button>
       </div>

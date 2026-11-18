@@ -1,13 +1,13 @@
 /*
- * Sign in and sign up. One column, a flat lavender circle behind the top (a flat shape instead of a gradient,
- * per RESEARCH.md C1), pill fields from the Input component, one accent button.
+ * Sign in and sign up. Same palette as the landing page: canvas background, black (ink) buttons and links, and a flat
+ * cream circle (the cream of the landing page pictures) behind the top, from the reference layout.
  */
 @layer components {
   .auth {
     position: relative;
     min-height: 100dvh;
     overflow: hidden;
-    background-color: var(--color-surface);
+    background-color: var(--color-canvas);
     padding: var(--space-4);
   }
 
@@ -19,7 +19,7 @@
     max-width: 640px;
     aspect-ratio: 1;
     border-radius: 50%;
-    background-color: color-mix(in srgb, var(--color-accent) 13%, var(--color-surface));
+    background-color: #f5efe6;
     pointer-events: none;
   }
 
@@ -92,7 +92,7 @@
   }
 
   .auth__link {
-    color: var(--color-accent);
+    color: var(--color-ink);
     font-weight: var(--weight-medium);
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -108,7 +108,7 @@
     min-height: var(--target-min);
     padding-inline: var(--space-3);
     border-radius: var(--radius-pill);
-    color: var(--color-accent);
+    color: var(--color-ink);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     cursor: pointer;
@@ -141,7 +141,7 @@
     width: 22px;
     height: 22px;
     margin-top: 1px;
-    accent-color: var(--color-accent);
+    accent-color: var(--color-ink);
   }
 
   .auth__consent-error {

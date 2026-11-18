@@ -39,7 +39,7 @@ export function LoginForm({ action }: LoginFormProps) {
       <PasswordField name="password" autoComplete="current-password" required error={fields.password} />
       <div className="auth__row">
         <Link href="/forgot-password" className="auth__link">Forgot password?</Link>
-        <Button type="submit" size="lg" variant="accent" status={pending ? "loading" : "idle"} loadingLabel="Signing in" trailingIcon={<DoorIcon />}>
+        <Button type="submit" size="lg" variant="primary" status={pending ? "loading" : "idle"} loadingLabel="Signing in" trailingIcon={<DoorIcon />}>
           Log in
         </Button>
       </div>
