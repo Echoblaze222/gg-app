@@ -1,6 +1,6 @@
 # Payments and Contribution Engine: Spec (AI-4)
 
-Status: M0 (this spec) and M1 (pure domain code in `lib/ledger`, `lib/contributions`, `lib/payments`) are done. M2 onward not started.
+Status: M0 (this spec), M1 (pure domain code in `lib/ledger`, `lib/contributions`, `lib/payments`) and M2 (provider boundary, Paystack adapter, fake provider in `lib/payments/provider`, `tests/payments`) are done. M3 onward not started.
 Owner of this document: AI-4. Contract version this was written against: 1.0.0.
 
 ## 1. Sources and what they settled
@@ -10,14 +10,14 @@ Provider facts below come from Paystack's official docs, read on 2026-11-14. Thi
 | Topic | Source | What it settled |
 |-------|--------|-----------------|
 | Webhooks | https://paystack.com/docs/payments/webhooks/ and https://docs-v2.paystack.com/payments/webhooks/ | Header `x-paystack-signature` is HMAC SHA512 of the payload keyed with the secret key. Three source IPs are published for optional allowlisting. Live mode retries every 3 minutes for 4 tries, then hourly for 72 hours. Test mode retries hourly for 72 hours. Payload has `event` and `data`. No top level event id was found. |
-| Verify | https://paystack.com/docs/payments/verify-payments/ and https://paystack.com/docs/api/transaction/ | `GET /transaction/verify/:reference`. Transaction status is `data.status`, not the top level `status`. Values: `abandoned`, `failed`, `ongoing`, `reversed`, `success`. Transaction id must be treated as an unsigned 64 bit integer, so we store it as text. Webhooks are sent for successful transactions only, so failures must be found by verify. |
-| Initialize | https://paystack.com/docs/api/transaction/ | `POST /transaction/initialize` returns `authorization_url`, `access_code`, `reference`. Reference allows only letters, digits, `-`, `.` and `=`. Amount is in the smallest unit. |
+| Verify | https://paystack.com/docs/payments/verify-payments/ and https://paystack.com/docs/api/transaction/ | `GET /transaction/verify/:reference`. Transaction status is `data.status`, not the top level `status`. Values: `abandoned`, `failed`, `ongoing`, `reversed`, `success`. Transaction id must be treated as an unsigned 64 bit integer, so we store it as text. Webhooks are sent for successful transactions only, so failures must be found by verify. The sample shows `amount` 40333 with `requested_amount` 30050 and `fees` 10283: when fees are passed to the customer, the paid total is the requested amount plus fees. |
+| Initialize | https://paystack.com/docs/api/transaction/ | `POST /transaction/initialize` returns `authorization_url`, `access_code`, `reference`. Reference allows only letters, digits, `-`, `.` and `=`. Amount is in the smallest unit, typed as a string in the docs. |
 | Saved cards | https://paystack.com/docs/payments/recurring-charges | Charge with `authorization_code`, customer `email` and `amount` at `POST /transaction/charge_authorization`. Only `reusable: true` authorizations may be charged. Only the email used to create an authorization can charge it. A challenged charge returns a redirect URL (`authorization_url`, `paused: true`). |
 | Bulk charge | https://paystack.com/docs/payments/bulk-charge/ | Only successful charges send webhooks. Failures need verify. Not used in v1 (see section 9). |
 | Refunds | https://paystack.com/docs/payments/refunds/ | `POST /refund` with a transaction reference. Optional `amount` for partial refund, never more than the original. We may pass our own refund `reference`. A repeated reference is not a failure, fetch the existing refund. Statuses: `pending`, `processing`, `processed`, `failed`, `needs-attention`. Failed refund credits the merchant balance back. |
 
 Not yet confirmed from official docs (adapter treats these defensively, see section 5.4):
-- Exact response statuses of `charge_authorization` other than the redirect form.
+- The redirect form of a challenged `charge_authorization`. No full sample body is published, so the adapter's redirect detection (an `authorization_url` in the answer) is an assumption.
 - The exact `gateway_response` strings for insufficient funds and declines.
 - Whether `ongoing` can persist for card payments after the customer closes checkout.
 
@@ -47,7 +47,7 @@ The database invariants I1 to I10 in `docs/architecture/01-vision-and-protocol.m
 | # | Invariant |
 |---|-----------|
 | A1 | A payment attempt is `successful` if and only if exactly one `contribution_credit` ledger entry references it. Reconciliation checks this. |
-| A2 | Credit happens only after verify returns status `success`, the same reference, currency NGN, and an amount equal to the attempt amount. Any mismatch posts nothing and opens a discrepancy. |
+| A2 | Credit happens only after verify returns status `success`, the same reference, currency NGN, and an amount equal to the attempt amount, or equal to the requested amount plus the provider's fees when fees are passed to the customer. Any mismatch posts nothing and opens a discrepancy. The ledger credits the attempt amount, never the provider total. |
 | A3 | A webhook body is a hint. It selects which reference to verify. It never supplies an amount or a status that we act on. |
 | A4 | One idempotency key maps to one reference for ever. We never create a second provider transaction for the same key. |
 | A5 | Domain events are published only by the caller that won the compare and set transition. A losing caller publishes nothing. |
@@ -112,7 +112,10 @@ The browser return calls `POST /api/payments/verify` with the reference. It runs
 - Explicit timeout on every call (default 10 s, from config).
 - No automatic retry on initialize or charge. A retry could double charge. Verify and fetch calls may retry on network errors with backoff and jitter, capped.
 - Responses are parsed with Zod. Unknown shapes become a typed `unknown` result that settlement treats as `ongoing`, never as success.
-- `charge_authorization` returns a closed union: `redirect` (URL), `final` (provider status), `unknown`.
+- `charge_authorization` returns a closed union: `redirect` (URL) or `submitted` (with an informational status hint). Neither proves money moved, so settlement always verifies by reference next.
+- Every failure carries `definitelyNotProcessed`. It is true only for refusals (4xx other than 429). Timeouts, network errors, 5xx, 429 and unreadable answers are unknown outcomes and must be settled by verify, never retried with a new reference.
+- Transaction ids are unsigned 64 bit, so long `id` values are quoted before JSON parsing and kept as text.
+- The adapter reads no environment. `lib/payments/provider/index.ts`, the only file importing `server-only`, builds it from env and fails every call as `unauthorized` when the key is missing.
 - Base URL from `PAYSTACK_BASE_URL`, key from `PAYSTACK_SECRET_KEY`, both server only (`import "server-only"`).
 - Errors are mapped to `PAYMENT_PROVIDER_UNAVAILABLE`, `PAYMENT_PROVIDER_TIMEOUT` or `PAYMENT_DECLINED`. Provider messages are never shown raw.
 - The fake provider for tests lives in `tests/payments/fake-provider.ts` and can script every status and failure.
@@ -262,7 +265,7 @@ Each milestone is one PR into `integration` with test output pasted in.
 |---|---------|----------|
 | M0 | This spec and the handoffs | Review |
 | M1 | Pure domain: money helpers, schedule, time based obligation status, reference, receipt number and charge key generation, transition guards and settlement paths, the verification decision (A2, A3) | Unit tests, exhaustive calendar checks, mutation check, lint, typecheck |
-| M2 | Provider interface, Paystack adapter, fake provider, fixtures | Contract tests |
+| M2 | Provider interface, Paystack adapter, fake provider, fixtures from the official samples, the fee pass through rule in the verification decision | Adapter tests for every status mapping and request shape, mutation check, lint, typecheck |
 | M3 | Payment service: initiate, settle, webhook processing, with in memory repositories | Full failure matrix tests |
 | M4 | Saved cards, charge runner, retry policy, notifications | Runner crash and resume tests |
 | M5 | Refunds, reversals, reconciliation, receipt service | Reconciliation tests |
@@ -284,3 +287,4 @@ Owner decisions needed (the engine builds them as configuration until answered):
 - Q4: Refund policy and who may refund.
 - Q5: Policy when a chargeback arrives after the member withdrew.
 - Q6: Does the manual transfer channel stay (ADR-011). Nothing is built for it until decided.
+- Q7: Who pays Paystack's fees? The default is the merchant. If the dashboard passes fees to the customer, the paid total is higher than the contribution. The engine accepts that case and credits only the contribution amount. Confirm which applies, because it decides how much of each contribution the owner actually receives.
