@@ -62,12 +62,13 @@ Uses throwaway users with plus addresses and deletes them at the end. It proves:
 - **Access token lifetime:** 900 seconds. Short enough to limit a stolen token, long enough that refresh traffic stays low. Dashboard setting, applied by Pius and recorded in `06-applied-changes.md` once done.
 - **Project password minimum:** 10, matching `password.ts`. Maximum in code becomes 72 bytes (problem 8).
 - **Leaked password protection:** turn it on if the project plan allows it. If not, it stays a documented known limit, as in the AuthService spec.
-- **Reauth store:** `public.session_reauth`, keyed by session id (problem 5), migration `2002_session_security.sql`.
-- **Session revoke:** `public.revoke_all_sessions` and `public.revoke_session` (problem 2), same migration. Not yet applied to the Supabase project.
+- **Reauth store:** `public.session_reauth`, keyed by session id (problem 5), migration `2002_session_security.sql`. Window: 600 seconds (`REAUTH_WINDOW_SECONDS`).
+- **Session revoke:** `public.revoke_all_sessions` and `public.revoke_session` (problem 2), same migration.
+- **Applied:** `2002` went onto the God's Grace project on 2026-11-18 as `ai2_session_security` (project still empty: 0 users, 0 members, 0 sessions). Checked on the real project: only `service_role` can run either function or touch `session_reauth`, row level security is on with no policies, both functions are security definer with a pinned search path, and the foreign keys from `auth.refresh_tokens` and `auth.mfa_amr_claims` to `auth.sessions` are `ON DELETE CASCADE` (so the refresh token part of the PROVE in problem 2 is settled from the real schema). A trial run inside a transaction that was rolled back by design, with two throwaway users, ended only the right sessions and left nothing behind. To fold into `06-applied-changes.md` once that file is on `main`.
 
 ## Still needs someone else
 
-- AI-1: `DeviceStore.revoke` must end the provider session, not only flag the row. The existing `device_sessions` table has no column for the provider's session id, so a device row cannot be matched to a session today. It needs one (for example `auth_session_id uuid`), `DeviceStore.revoke` should call `revoke_session` and then set `revoked_at`, and the resolver's device check should look the row up by that id.
+- AI-1: `device_sessions.session_id` already exists on the project (applied as `ai2_device_sessions_session_id`, see `06-applied-changes.md`; nullable, unique where set). `DeviceStore.revoke` must call `public.revoke_session(member, session_id)` and then set `revoked_at`, so revoking a device really ends its session and not only flags the row. `device-gate.ts` reads the row by that column. AI-1's repository must also fill `session_id` when it records a device, or the resolver's device check finds no row and treats the session as not revoked.
 - The super admin's client: confirm two enrolled authenticators as the MFA recovery plan. The proof script cannot be final until then.
 
 Not in this milestone: secure headers, CSRF, CORS, `proxy.ts`, Google sign in.
