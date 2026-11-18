@@ -4,6 +4,8 @@ import { cookies, headers } from "next/headers";
 import type { AuthService, RequestContext } from "@/contracts/services";
 import type { Uuid } from "@/contracts/entities";
 import { AuthConfigError, authLogger, composeAuth, readCurrentPolicyIds } from "@/lib/auth/composition";
+import { startGoogleOAuth } from "@/lib/auth/flows";
+import { createRequestAuthFull, fromNextCookies } from "@/lib/auth/supabase-clients";
 
 /**
  * The one place the auth screens reach the server side services.
@@ -28,13 +30,30 @@ export async function getAuthService(): Promise<AuthService | null> {
   }
 }
 
+/** The public address of the site. NEXT_PUBLIC_SITE_URL wins; otherwise the request's own host, which Supabase checks against its allowed redirect list. */
+export async function siteOrigin(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) throw new AuthConfigError("NEXT_PUBLIC_SITE_URL is not set");
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 /**
- * Where to send the browser to start Google sign in or sign up, or null while that is not wired.
- * The same path serves both: Google tells us whether the account is new. Needs an OAuth route from AI-2 (routes.md lists it).
+ * Where to send the browser to start Google sign in or sign up, or null while Google is not switched on for the project.
+ * The same address serves both: Google tells us whether the account is new, and /auth/callback decides what happens next.
  */
 export async function getGoogleAuthUrl(ctx: RequestContext): Promise<string | null> {
   void ctx;
-  return null;
+  try {
+    const auth = createRequestAuthFull(fromNextCookies(await cookies(), { writable: true }));
+    return await startGoogleOAuth(auth, { redirectTo: `${await siteOrigin()}/auth/callback` });
+  } catch (err) {
+    logUnavailable("google_auth", err);
+    return null;
+  }
 }
 
 /** Ids of the policy versions a new member accepts. Read on the server so the browser can never choose them. Empty until terms and privacy are published. */
