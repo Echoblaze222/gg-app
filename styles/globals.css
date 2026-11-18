@@ -14,6 +14,7 @@
 @import "./components/data-table.css";
 @import "./components/tilt.css";
 @import "./components/auth.css";
+@import "./components/receipt-printer.css";
 
 @layer base {
   html {

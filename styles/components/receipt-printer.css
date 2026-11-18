@@ -1,0 +1,293 @@
+/*
+ * Receipt printer. Black printer body, white paper, status colors only for the light and the stamp.
+ * Hero moment, 2.9 s end to end: feed 1.6 s, amount, stamp, detach, then the buttons rise in.
+ * Only transform and opacity animate. With reduced motion the finished receipt shows at once.
+ */
+@layer components {
+  .printer {
+    --paper: var(--color-surface);
+    --paper-w: 208px;
+    --body-w: 264px;
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    margin: 0;
+  }
+
+  .printer__stage {
+    position: relative;
+    width: var(--body-w);
+    height: 392px;
+  }
+
+  .printer__body {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 2;
+    height: 64px;
+    border-radius: 20px;
+    background: var(--color-ink);
+  }
+
+  .printer__light {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #8d8d86;
+  }
+
+  .printer__slot {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: 12px;
+    height: 6px;
+    border-radius: 3px;
+    background: #000;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  /* The paper is clipped to the area under the slot, so it appears to come out of it. */
+  .printer__window {
+    position: absolute;
+    z-index: 1;
+    top: 52px;
+    left: calc((var(--body-w) - var(--paper-w)) / 2);
+    width: var(--paper-w);
+    height: 340px;
+    overflow: hidden;
+  }
+
+  .printer__paper {
+    position: relative;
+    width: 100%;
+    padding: var(--space-4) var(--space-4) calc(var(--space-6) + 12px);
+    background: var(--paper);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+    border-bottom: 0;
+    font-size: var(--text-sm);
+    transform: translateY(-101%);
+  }
+
+  .printer__brand {
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.02em;
+  }
+
+  .printer__kind {
+    color: var(--color-ink-muted);
+    margin-bottom: var(--space-3);
+  }
+
+  .printer__lines {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding-block: var(--space-3);
+    border-block: 1px dashed color-mix(in srgb, var(--color-ink) 25%, transparent);
+  }
+
+  .printer__line {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .printer__line dt {
+    color: var(--color-ink-muted);
+  }
+
+  .printer__line dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+
+  .printer__amount {
+    margin-top: var(--space-3);
+    font-size: 1.5rem;
+    font-weight: var(--weight-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .printer__ref {
+    margin-top: var(--space-2);
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+    word-break: break-all;
+  }
+
+  .printer__stamp {
+    position: absolute;
+    right: var(--space-3);
+    bottom: calc(var(--space-6) + 22px);
+    padding: 2px 10px;
+    border: 2px solid var(--color-success);
+    border-radius: 6px;
+    color: var(--color-success);
+    font-size: 0.8125rem;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transform: rotate(-8deg);
+    opacity: 0;
+  }
+
+  /* Torn zigzag edge along the bottom of the paper. */
+  .printer__tear {
+    position: absolute;
+    left: -1px;
+    right: -1px;
+    bottom: -11px;
+    height: 12px;
+    background:
+      linear-gradient(135deg, var(--paper) 25%, transparent 25%) -6px 0 / 12px 12px,
+      linear-gradient(225deg, var(--paper) 25%, transparent 25%) -6px 0 / 12px 12px;
+  }
+
+  .printer__status {
+    max-width: 30ch;
+    text-align: center;
+    color: var(--color-ink-muted);
+  }
+
+  .printer__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+    opacity: 0;
+    animation: printer-rise 300ms var(--ease-enter) 2.6s forwards;
+  }
+
+  .printer__actions--now {
+    animation-delay: 0ms;
+  }
+
+  /* ---- states ---- */
+  .printer[data-state="printing"] .printer__light {
+    background: var(--color-pending);
+    animation: printer-blink 700ms ease-in-out infinite alternate;
+  }
+
+  .printer[data-state="printed"] .printer__light {
+    background: var(--color-success);
+  }
+
+  .printer[data-state="failed"] .printer__light {
+    background: var(--color-error);
+  }
+
+  .printer[data-state="printing"] .printer__paper {
+    animation:
+      printer-feed 1.6s steps(16, end) forwards,
+      printer-detach 300ms var(--ease-standard) 2.5s forwards;
+  }
+
+  .printer[data-state="printing"] .printer__line {
+    opacity: 0;
+    animation: printer-fade 200ms var(--ease-enter) calc(0.2s + var(--i) * 0.2s) forwards;
+  }
+
+  .printer[data-state="printing"] .printer__amount {
+    opacity: 0;
+    animation: printer-settle 300ms var(--ease-enter) 1.7s forwards;
+  }
+
+  .printer[data-state="printing"] .printer__stamp {
+    animation: printer-stamp 350ms var(--ease-emphasized) 2.1s forwards;
+  }
+
+  .printer[data-state="printed"] .printer__paper {
+    transform: translateY(8px) rotate(-0.5deg);
+  }
+
+  .printer[data-state="printed"] .printer__stamp {
+    opacity: 1;
+  }
+
+  /* Finished at once: no feed, no rise. */
+  .printer[data-instant="true"] .printer__actions,
+  .printer[data-state="printed"][data-instant="true"] .printer__actions {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* Calm paper jam: the paper stops half out and settles crooked. No red flash, no shake. */
+  .printer[data-state="failed"] .printer__paper {
+    transform: translateY(-58%) rotate(2deg);
+    transform-origin: 50% 0;
+    animation: printer-jam 700ms var(--ease-standard) both;
+  }
+
+  @keyframes printer-feed {
+    from { transform: translateY(-101%); }
+    to { transform: translateY(0); }
+  }
+
+  @keyframes printer-detach {
+    from { transform: translateY(0) rotate(0deg); }
+    to { transform: translateY(8px) rotate(-0.5deg); }
+  }
+
+  @keyframes printer-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes printer-settle {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes printer-stamp {
+    0% { opacity: 0; transform: rotate(-8deg) scale(1.8); }
+    70% { opacity: 1; transform: rotate(-8deg) scale(0.94); }
+    100% { opacity: 1; transform: rotate(-8deg) scale(1); }
+  }
+
+  @keyframes printer-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes printer-jam {
+    from { transform: translateY(-101%) rotate(0deg); }
+    to { transform: translateY(-58%) rotate(2deg); }
+  }
+
+  @keyframes printer-blink {
+    from { opacity: 1; }
+    to { opacity: 0.35; }
+  }
+
+  /* Reduced motion: the finished receipt (or the jam) appears at once, with the same text status. */
+  @media (prefers-reduced-motion: reduce) {
+    .printer[data-state="printing"] .printer__paper {
+      animation: none;
+      transform: translateY(8px) rotate(-0.5deg);
+    }
+    .printer[data-state="printing"] .printer__line,
+    .printer[data-state="printing"] .printer__amount {
+      animation: none;
+      opacity: 1;
+    }
+    .printer[data-state="printing"] .printer__stamp {
+      animation: none;
+      opacity: 1;
+    }
+    .printer[data-state="printing"] .printer__light {
+      animation: none;
+    }
+    .printer[data-state="failed"] .printer__paper {
+      animation: none;
+    }
+    .printer__actions {
+      animation: none;
+      opacity: 1;
+    }
+  }
+}
