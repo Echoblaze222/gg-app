@@ -112,7 +112,7 @@ describe("list", () => {
     ["search over 100", { search: "x".repeat(101) }],
     ["control character in search", { search: "ada\u0000" }],
     ["line break in search", { search: "ada\nbob" }],
-    ["bidi override in search", { search: "ada‮bob" }],
+    ["bidi override in search", { search: "ada\u202Ebob" }],
   ])("rejects %s", async (_label, input) => {
     const h = harness();
     const result = await h.service.list(ctx, input as { status?: MemberStatus; search?: string }, { limit: 10 });
