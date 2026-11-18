@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import type { SbAuthExtras } from "./supabase-extras";
 import type { SbAuth } from "./supabase-like";
 
 /**
@@ -43,6 +44,13 @@ export function createRequestAuth(cookies: CookieAdapter): SbAuth {
   const { url, key } = publicConfig();
   const client = createServerClient(url, key, { cookies: { getAll: () => cookies.getAll(), setAll: (list) => cookies.setAll(list) } });
   return client.auth as unknown as SbAuth;
+}
+
+/** Same client as createRequestAuth, typed with the extra calls the confirmation route and MFA enrolment use. */
+export function createRequestAuthFull(cookies: CookieAdapter): SbAuth & SbAuthExtras {
+  const { url, key } = publicConfig();
+  const client = createServerClient(url, key, { cookies: { getAll: () => cookies.getAll(), setAll: (list) => cookies.setAll(list) } });
+  return client.auth as unknown as SbAuth & SbAuthExtras;
 }
 
 /** No cookies, nothing stored, nothing refreshed. Create a new one per operation. */
