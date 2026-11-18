@@ -27,7 +27,7 @@ export function ForgotPasswordForm({ action }: ForgotPasswordFormProps) {
       <FormAlert state={state} />
       <Input label="Email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} required error={fields.email} />
       <div className="auth__row auth__row--end">
-        <Button type="submit" size="lg" variant="accent" status={pending ? "loading" : "idle"} loadingLabel="Sending the link">
+        <Button type="submit" size="lg" variant="primary" status={pending ? "loading" : "idle"} loadingLabel="Sending the link">
           Send reset link
         </Button>
       </div>
