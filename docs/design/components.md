@@ -78,5 +78,14 @@ Names are frozen in `contracts/design-tokens.md`. In Tailwind: `bg-canvas`, `bg-
 
 Rules: one accent hue; status is never color alone (icon and text too); card hairlines use `border-ink/10`, controls use `border-border`.
 
+### Dashboard building blocks (added 2026-11-19)
+- `AppShell` (`components/ui/AppShell.tsx`): signed in layout. Sidebar from 1024 px, bottom tab bar below (same black active pill), top bar with an `actions` slot, skip link, offline banner, `ToastProvider` (toasts sit above the tab bar automatically). Props: `brand`, `area?`, `navLabel`, `nav: NavItem[]`, `actions?`. Add a nav entry only when its route exists.
+- `NavLinks`, `NavItem { href, label, icon, exact?, badge? }`: sets `aria-current="page"` from the path.
+- `ProgressRing { value 0..1, label }`: only for a real ratio with a written formula. Clamps, NaN is empty.
+- `TimelinePills { items, label }`: `paid | due | overdue | upcoming | missed`, each with text and a distinct shape. Black pill for entries that need attention. Vertical on phones.
+- `EmptyState { title, children, icon?, action? }` and `ErrorState { title, message, moneyLine, action, reference?, retry? }`. ErrorState requires the money line. Use `describeError()` from `lib/dashboard/describe-error.ts` to build the copy from a contract error.
+- `DataTable { caption, columns, rows, rowKey, empty }`: one real table, cards below 768 px via CSS (`data-label`).
+- `OfflineBanner`: announces going offline and coming back. `Icon`: 10 line icons.
+
 ## Next (in this order)
-Empty, error and success screens, sheet and modal, navigation (sidebar, bottom tab bar), timeline pills, progress ring, data table that collapses to cards, then the animation catalogue, receipt printer, auth screens, marketing site.
+Sheet and modal, the animation catalogue, receipt printer, auth screens, marketing site.
