@@ -35,7 +35,7 @@ describe("buildSchedule", () => {
     expect(pills.map((p) => p.id)).toEqual(["ok"]);
   });
   it("formats amounts with the member money rules", () => {
-    expect(buildSchedule([ob("a", "2026-11-20", "scheduled", 500000)], "2026-11-19")[0].amount).toBe("\\u20A65,000.00");
+    expect(buildSchedule([ob("a", "2026-11-20", "scheduled", 500000)], "2026-11-19")[0].amount).toBe("\u20A65,000.00");
   });
   it("returns an empty list for no obligations", () => {
     expect(buildSchedule([], "2026-11-19")).toEqual([]);
