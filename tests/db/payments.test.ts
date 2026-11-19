@@ -142,7 +142,6 @@ describe("payment attempt state machine is enforced by the database", () => {
     expect(await balanceOf(m)).toEqual({ ledger: 0, held: 0, available: 0 });
   });
 
-  it.todo("a reversed payment takes its money back out of the ledger (see PR notes: not implemented in migration 1110)");
 });
 
 describe("I4: the same provider webhook is processed once", () => {
