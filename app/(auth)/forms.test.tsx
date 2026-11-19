@@ -113,6 +113,27 @@ describe("MfaForm", () => {
     const field = screen.getByLabelText("6 digit code");
     expect(field).toHaveAttribute("autocomplete", "one-time-code");
     expect(field).toHaveAttribute("inputmode", "numeric");
-    expect(field).toHaveAttribute("maxlength", "6");
+    // No maxlength: a code pasted as "123 456" must not lose a digit. The component strips spaces and keeps six digits.
+    expect(field).not.toHaveAttribute("maxlength");
+  });
+});
+
+describe("MfaForm boxes", () => {
+  it("shows typed digits in boxes and accepts a pasted code with a space", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<MfaForm action={async () => ({ status: "idle" })} />);
+    const field = screen.getByLabelText("6 digit code") as HTMLInputElement;
+    await user.click(field);
+    await user.paste("123 456");
+    expect(field.value).toBe("123456");
+    expect(Array.from(container.querySelectorAll(".otp__digit")).map((d) => d.textContent).join("")).toBe("123456");
+  });
+
+  it("submits by itself when the sixth digit is in", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(async (): Promise<AuthFormState> => ({ status: "idle" }));
+    render(<MfaForm action={action} />);
+    await user.type(screen.getByLabelText("6 digit code"), "123456");
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
   });
 });

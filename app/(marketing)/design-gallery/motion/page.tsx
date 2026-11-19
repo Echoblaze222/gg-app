@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { PaymentStagesDemo, ReceiptPrinterDemo } from "../MotionDemos";
+import { EnvelopeDemo, OtpDemo, PaymentStagesDemo, ReceiptPrinterDemo } from "../MotionDemos";
 
 export const metadata: Metadata = { title: "Design gallery: motion", robots: { index: false, follow: false } };
 
@@ -16,6 +16,22 @@ export default function MotionGalleryPage() {
           Every animation follows a real state from the server and has a text status and a reduced motion version.
         </p>
       </header>
+      <section className="grid gap-6" aria-labelledby="gallery-otp">
+        <h2 id="gallery-otp" className="text-2xl">
+          One time code
+        </h2>
+        <p className="text-sm text-ink-muted">
+          One real input underneath, so typing, paste and SMS autofill work. Digits pop in, the boxes pulse while checking, and on success they merge into a check.
+        </p>
+        <OtpDemo />
+      </section>
+      <section className="grid gap-6" aria-labelledby="gallery-envelope">
+        <h2 id="gallery-envelope" className="text-2xl">
+          Email sent
+        </h2>
+        <p className="text-sm text-ink-muted">The envelope folds shut and slides away, then a check takes its place.</p>
+        <EnvelopeDemo />
+      </section>
       <section className="grid gap-6" aria-labelledby="gallery-stages">
         <h2 id="gallery-stages" className="text-2xl">
           Payment stages
