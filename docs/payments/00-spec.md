@@ -1,6 +1,6 @@
 # Payments and Contribution Engine: Spec (AI-4)
 
-Status: M0 (this spec), M1 (pure domain code in `lib/ledger`, `lib/contributions`, `lib/payments`) and M2 (provider boundary, Paystack adapter, fake provider in `lib/payments/provider`, `tests/payments`) are done. M3 onward not started.
+Status: M0 (this spec), M1 (pure domain code in `lib/ledger`, `lib/contributions`, `lib/payments`) and M2 (provider boundary, Paystack adapter, fake provider in `lib/payments/provider`, `tests/payments`) are done. M3 (payment service, section 17) is in progress. M4 onward not started.
 Owner of this document: AI-4. Contract version this was written against: 1.0.0, with the additive v1.1.0 file `contracts/v1_1.ts` applied by the Integrator.
 
 ## 1. Sources and what they settled
@@ -93,13 +93,13 @@ Steps, in this order. Each step is safe to repeat:
    - `ongoing`: transition `verifying` back to `processing` (allowed by the contract) and stop.
    - `reversed`: see section 11.
    - any other value: treat as `ongoing`. Never as success.
-6. Post the ledger credit first. It is idempotent on the attempt id, so a repeat returns the existing entry.
-7. Compare and set `verifying` to `successful`. Only the winner continues to step 8.
-8. Transition the obligation `due` to `paid` with the attempt id (compare and set).
-9. If the purpose is `card_authorization` and the authorization is reusable, save the method (section 8).
-10. Publish `payment.succeeded`, `ledger.entry_posted`, then notify the member.
+6. Post the ledger credit. It is idempotent on the attempt id, so a repeat returns the existing entry. A receipt number collision is retried with a new number, at most 3 times (Integrator decision).
+7. Transition the obligation to `paid` with the attempt id, by compare and set. The contract has no direct `scheduled` to `paid` edge, so a still scheduled obligation goes `scheduled`, `due`, `paid` (`pathToPaid`).
+8. If the purpose is `card_authorization` and the authorization is reusable, save the method (section 8). Idempotent on member and card signature.
+9. Compare and set `verifying` to `successful`. Only the winner continues.
+10. The winner publishes `payment.status_changed` and `payment.succeeded`, then notifies the member. `ledger.entry_posted` is published by the caller that created the entry (`created: true`), and `payment_method.saved` by the caller that created the method.
 
-Why ledger before status: a crash after step 6 leaves a credit with an attempt still `verifying`. The next run finds the existing credit (`created: false`), then finishes steps 7 to 10. The opposite order could leave `successful` with no credit, which is the bad direction. Reconciliation also detects both.
+Why the terminal status comes last (changed in M3, the earlier order was ledger, status, then the rest): every step before the status flip is idempotent or compare and set, and the attempt stays non terminal until all of them are done. A crash anywhere before step 9 leaves a `verifying` attempt that the next callback, webhook or reconciliation run settles again, repeating each step harmlessly and finishing the missing ones. With the old order a crash between the status flip and the obligation update left a `successful` attempt that nothing would ever revisit, because step 2 returns terminal attempts untouched. The only window left after step 9 is a lost event or notification, never lost state. The ledger still comes before the status, so `successful` never exists without a credit (A1).
 
 ### 5.3 Return route and polling
 
@@ -290,4 +290,48 @@ Owner decisions needed (the engine builds them as configuration until answered):
 - Q6: Does the manual transfer channel stay (ADR-011). Nothing is built for it until decided.
 - Q7 (answered by the owner): fee handling depends on the admin, so it is a setting, `payment.fee_bearer`, behind the `admin.settings.update` permission. The engine credits only the contribution amount in both modes. If the setting says `merchant` but the provider adds fees, the payment is held as an amount mismatch and not credited, which is loud on purpose. Whoever changes the dashboard fee option must change this setting in the same step.
 
-Note: the Integrator's decisions file (`docs/handoffs/integrator-decisions-001.md`) already answers Q1 to Q3. Check it before building any rule, and treat the spec text above as superseded where they differ.
+Note: the Integrator's decisions file (`docs/handoffs/integrator-decisions-001.md`) answers AI-4's contract and database questions (also numbered Q1 to Q3 there: receipt number collisions, forged webhooks, settings seeds). It does not answer the owner questions Q1 to Q6 above. Those stay open and stay configuration. Check the file before building any rule, and treat the spec text above as superseded where they differ.
+
+## 17. M3 payment service: decisions and findings
+
+Written before the code. Scope of M3: `initiate`, `verifyAndSettle`, `getAttempt`, `listHistory`, the webhook service and the settlement core, against contracts v1.1.0, with in memory repositories under `tests/payments/`. Saved method charging (listing, removing, `paymentMethodId` on initiate) is M4. Refunds and reversal of credited payments are M5.
+
+### 17.1 Provider facts re-checked for M3 (official page, 2026-11-19)
+Confirmed on https://paystack.com/docs/payments/webhooks/: signature is HMAC SHA512 of the payload keyed with the secret key; events include `charge.success`, `charge.dispute.create`, `charge.dispute.remind`, `charge.dispute.resolve`, `refund.failed`, `refund.pending`, `refund.processed`, `refund.processing`. The official sample hashes `JSON.stringify(req.body)`. We verify the raw body instead, which is stricter. Still no documented event id. Confirmed from the initialize sample in the transaction docs: `authorization_url` is `https://checkout.paystack.com/` plus `access_code`, which is what lets a repeated tap rebuild the checkout link from the stored access code (CR-1). Not confirmed: the field names inside `refund.*` payloads (M3 does not read them), and whether `charge.success` payloads can ever lack `data.reference` (handled: ignored).
+
+### 17.2 Decisions
+1. **Entry points.** The member facing `verifyAndSettle` checks the caller owns the reference. Webhooks and reconciliation call the same settler with no ownership check. A null `actorId` is never treated as system, because a route that forgot to authenticate would also have a null actor.
+2. **Not found and not owner both return `NOT_FOUND`** for obligations and attempts, so the response never reveals that another member's id exists. This replaces step 4 of section 5.1, which said `VALIDATION_FAILED`. Wrong status or amount stays `VALIDATION_FAILED` with the field named.
+3. **Obligation double payment guard.** `initiate` rejects a new key for an obligation that already has an attempt in flight (`PAYMENT_DUPLICATE_IN_PROGRESS`), using `listByObligation`. Attempts with the same key pass through so a repeated tap still returns the same attempt. Two different keys racing past the check cannot be stopped in code. The fix is a partial unique index on in flight attempts per obligation (handoff to AI-1). Until then both could be credited, which is the member's own money going to the member's own balance, and the obligation is paid once.
+4. **Initialize outcomes.** Refused by the provider (`definitelyNotProcessed`): attempt goes to `failed`, answer `PAYMENT_PROVIDER_UNAVAILABLE`. Timeout or unreadable answer: attempt stays `initiating`, answer `PAYMENT_PROVIDER_TIMEOUT`. Network error, 5xx or 429: attempt stays `initiating`, answer `PAYMENT_PROVIDER_UNAVAILABLE`. A checkout link is the only way money moves in the hosted flow and we return a link only after the provider answers, so none of these can have moved money. Known limitation: a repeated tap on a stuck `initiating` attempt answers `PAYMENT_DUPLICATE_IN_PROGRESS` until the attempt expires.
+5. **Checkout host check.** The authorization URL must be https, carry no credentials or port, and have a host in `payment.allowed_checkout_hosts` (CR-10, still a request, so the default `checkout.paystack.com` applies when the setting is missing). A URL that fails the check fails the attempt, and the member is never redirected to it.
+6. **Settings failures never decide money.** If the fee bearer setting cannot be read, settlement answers `SYSTEM_UNAVAILABLE` and leaves the attempt as it is. Falling back to `merchant` there would fail a real customer paid payment for good.
+7. **Verify failures.** Timeout, unreadable answer or provider outage: attempt stays `verifying`, answer `PAYMENT_PROVIDER_TIMEOUT` (money moved: unknown). Our key refused: `SYSTEM_UNAVAILABLE`. The provider has no record of the reference: step back to `processing` and wait for expiry.
+8. **Mismatch and reversed before credit.** A discrepancy record is written first, then the attempt goes to `failed` (`PROVIDER_VERIFY_MISMATCH` or `PAYMENT_REVERSED`), nothing is credited. If the record cannot be written the attempt stays `verifying` and is retried, so a mismatch is never dropped silently. Operational note: a wrong `payment.fee_bearer` setting fails real payments terminally. The way out is an admin adjustment reviewed through the discrepancy record. Reversal of an already credited attempt is M5.
+9. **Obligation anomalies do not block the credit.** The money is real, so the credit stands. An obligation that is missing, cancelled, or already paid by a different attempt opens a discrepancy record.
+10. **Events.** Every transition emits `payment.status_changed`, published only by the caller that won that compare and set (A5). Event or notification failures are logged and never fail settlement. There is no transactional outbox, so a crash between a commit and its event loses that event (for example `ledger.entry_posted` when the process dies right after the credit commits, because the rerun sees `created: false`). State is never lost and an event is never published twice by one transition. Consumers must treat events as hints and reconciliation as the check.
+11. **Webhook storage is sanitized.** `charge.success` bodies carry the authorization code and card signature. The stored `rawPayload` keeps an allowlist of scalar fields (event, id, reference, status, amount, currency, channel, paid_at, gateway_response, fees) plus the SHA 256 of the raw body, so no card reference sits in `payment_events`. This differs from the contract comment "raw body exactly as received". Raised with the Integrator in the handoff.
+12. **Duplicate webhooks reprocess unfinished events.** A duplicate whose stored event is not processed, or is processed with an error, runs again. Safe because settlement is idempotent. This needs `listUnprocessed` to return both kinds (handoff to AI-1, requirement 13).
+13. **Events by type.** `charge.success` settles by reference, ignoring the body amount (A3). `refund.*` events are stored and left unprocessed until M5. Everything else, including `charge.dispute.*`, is stored and marked processed with no action.
+14. **Receipt collision error.** The Integrator said `post` throws a typed error and the code `LEDGER_RECEIPT_CONFLICT` would be added if missing. It is not in `contracts/errors.ts` or `v1_1.ts` yet, so the service recognises an error whose `code` is `LEDGER_RECEIPT_CONFLICT` without importing a type. Handoff asks the Integrator to add the code.
+15. **Open requests built around, not on.** CR-8 (receipt number on history), CR-9 (`getLimits`) and CR-10 (return route, allowed hosts setting) are not in v1.1.0. M3 uses only v1.1.0 types and keeps `listHistory` at the frozen return type.
+
+### 17.3 Failure matrix additions
+| Case | What happens | Final state | Test |
+|------|--------------|-------------|------|
+| Crash after obligation update, before status flip | rerun repeats credit lookup, obligation and method, then flips | successful | `settle.crash_after_obligation` |
+| Receipt number collision, twice then free | retried with new numbers, one credit | successful | `settle.receipt_collision` |
+| Receipt number collision three times | nothing credited, attempt stays verifying | verifying | `settle.receipt_collision` (gives up after three) |
+| Settings unreadable during settlement | nothing changes, answer unavailable | unchanged | `settle.settings_unavailable` |
+| Obligation still scheduled when paid | goes scheduled, due, paid | successful | `settle.obligation_scheduled` |
+| Obligation already paid by another attempt | credit stands, discrepancy opened | successful | `settle.obligation_paid_elsewhere` |
+| Discrepancy record cannot be written | attempt stays verifying, retried | verifying | `settle.discrepancy_write_fails` |
+| Provider reports reversed before credit | no credit, discrepancy, failed | failed | `settle.reversed_before_credit` |
+| Different key, same obligation, first in flight | `PAYMENT_DUPLICATE_IN_PROGRESS` | unchanged | `initiate.obligation_in_flight` |
+| Authorization URL on a foreign host | attempt failed, no redirect | failed | `initiate.foreign_checkout_host` |
+| Repeated tap after the link was issued | same attempt, link rebuilt from stored access code | awaiting_authentication | `initiate.repeat_after_link` |
+| Valid signature, card data in body | stored payload has no authorization or card fields | unchanged | `webhook.no_card_data_stored` |
+| Duplicate of an event that failed processing | processed again, one credit | successful | `webhook.duplicate_reprocesses_failed` |
+| Valid signature, body not JSON | stored with the body hash, marked processed with no error (retrying cannot help), no action | unchanged | `webhook.unparseable_body` |
+| Forged flood | 401 each time, security events rate limited | unchanged | `webhook.forged_rate_limited` |
+
