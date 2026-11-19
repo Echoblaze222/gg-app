@@ -28,4 +28,4 @@ exist and the shim changes nothing.
 | `limits.test.ts` | ADR-014: 500,000 naira savings cap per member, in flight attempts counted, forced concurrent attempts, a missing cap blocks, `admin.limits.update` is owner only. |
 | `append-only.test.ts` | Audit log and security events cannot be changed. Step up challenges store hashes only. |
 
-Two `it.todo` entries mark a known gap: a payment that moves to `reversed` does not take its credit back out of the ledger.
+Reversals are covered in `reversals.test.ts` (migration 1971): a reversed payment takes its credit back out, and what cannot be taken back becomes a shortfall that blocks payouts.
