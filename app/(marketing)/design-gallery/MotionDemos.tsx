@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui";
+import { EnvelopeSent } from "@/components/motion/EnvelopeSent";
+import { OtpInput, type OtpState } from "@/components/motion/OtpInput";
 import { PaymentStages, type MoneyMoved, type PaymentStageState } from "@/components/motion/PaymentStages";
 import { ReceiptPrinter, type ReceiptPrinterState } from "@/components/motion/ReceiptPrinter";
 
@@ -92,6 +94,43 @@ export function PaymentStagesDemo() {
           moneyMoved: money,
         }}
       />
+    </div>
+  );
+}
+
+export function OtpDemo() {
+  const [state, setState] = useState<OtpState>("idle");
+  const [run, setRun] = useState(0);
+  const play = (next: OtpState) => {
+    setState(next);
+    setRun((n) => n + 1);
+  };
+  return (
+    <div className="grid justify-items-center gap-6">
+      <div className="flex flex-wrap justify-center gap-2">
+        {(["idle", "verifying", "success", "error"] as const).map((value) => (
+          <Button key={value} variant={state === value ? "primary" : "secondary"} aria-pressed={state === value} onClick={() => play(value)}>
+            {value}
+          </Button>
+        ))}
+      </div>
+      <div className="w-full max-w-sm">
+        <OtpInput key={run} label="6 digit code" state={state} error="That code is not correct. Check it and try again." />
+      </div>
+    </div>
+  );
+}
+
+export function EnvelopeDemo() {
+  const [state, setState] = useState<"idle" | "sent">("sent");
+  const [run, setRun] = useState(0);
+  return (
+    <div className="grid justify-items-center gap-4">
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={() => { setState("sent"); setRun((n) => n + 1); }}>Send</Button>
+        <Button variant="secondary" onClick={() => { setState("idle"); setRun((n) => n + 1); }}>Reset</Button>
+      </div>
+      <EnvelopeSent key={run} state={state} />
     </div>
   );
 }
