@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Alert, Button, Card, Input, Skeleton, SkeletonGroup, ToastProvider } from "@/components/ui";
+import { Alert, Button, Card, DataTable, EmptyState, ErrorState, Input, ProgressRing, Skeleton, SkeletonGroup, TimelinePills, ToastProvider } from "@/components/ui";
 import type { ButtonProps } from "@/components/ui";
 import { DismissibleAlertDemo, ToastDemo } from "./ClientDemos";
 
@@ -178,6 +178,78 @@ export default function DesignGalleryPage() {
           </h2>
           <p className="text-sm text-ink-muted">Hover or focus a toast to pause it. Errors stay until dismissed. At most three show at once.</p>
           <ToastDemo />
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-ring">
+          <h2 id="gallery-ring" className="text-2xl">
+            Progress ring
+          </h2>
+          <p className="text-sm text-ink-muted">Only for a real ratio with a written formula. Gallery values are samples.</p>
+          <div className="flex flex-wrap items-center gap-6 rounded-lg border border-ink/10 bg-surface p-4">
+            {[0, 0.25, 0.5, 1].map((v) => (
+              <div key={v} className="flex items-center gap-3">
+                <ProgressRing value={v} label={`${Math.round(v * 100)} percent`} />
+                <span className="text-sm">{Math.round(v * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-timeline">
+          <h2 id="gallery-timeline" className="text-2xl">
+            Timeline pills
+          </h2>
+          <div className="rounded-lg border border-ink/10 bg-surface p-4">
+            <TimelinePills
+              label="Sample schedule"
+              items={[
+                { id: "1", date: "Sat 7 Nov", title: "NGN 5,000", status: "paid" },
+                { id: "2", date: "Sat 14 Nov", title: "NGN 5,000", status: "missed" },
+                { id: "3", date: "Sat 21 Nov", title: "NGN 5,000", status: "overdue" },
+                { id: "4", date: "Sat 28 Nov", title: "NGN 5,000", status: "due" },
+                { id: "5", date: "Sat 5 Dec", title: "NGN 5,000", status: "upcoming" },
+              ]}
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-states">
+          <h2 id="gallery-states" className="text-2xl">
+            Empty and error states
+          </h2>
+          <Card>
+            <EmptyState title="No activity yet" icon="inbox">
+              Confirmed contributions and withdrawals show here.
+            </EmptyState>
+          </Card>
+          <Card tone="ink">
+            <EmptyState title="Nothing due right now" icon="card">
+              Your next contribution shows here before it is due.
+            </EmptyState>
+          </Card>
+          <ErrorState title="Balance did not load" message="The service is temporarily unavailable." moneyLine="No money moved." action="Try again shortly. It is safe to try again." reference="req-sample-123" retry={<Button variant="secondary">Try again</Button>} />
+        </section>
+
+        <section className="grid gap-6" aria-labelledby="gallery-table">
+          <h2 id="gallery-table" className="text-2xl">
+            Data table (cards below 768 px)
+          </h2>
+          <Card>
+            <DataTable
+              caption="Sample payments"
+              columns={[
+                { key: "ref", header: "Reference", cell: (r: { ref: string; amount: string; status: string }) => r.ref },
+                { key: "amount", header: "Amount", align: "end", cell: (r) => r.amount },
+                { key: "status", header: "Status", cell: (r) => r.status },
+              ]}
+              rows={[
+                { ref: "gg_sample_001", amount: "NGN 5,000", status: "Successful" },
+                { ref: "gg_sample_002", amount: "NGN 5,000", status: "Failed" },
+              ]}
+              rowKey={(r) => r.ref}
+              empty={<EmptyState title="No payments">Nothing here yet.</EmptyState>}
+            />
+          </Card>
         </section>
       </main>
     </ToastProvider>
