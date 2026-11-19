@@ -255,7 +255,7 @@ describe("verify", () => {
     expect(calls[0]!.body).toBeUndefined();
   });
 
-  it("the official sample settles through evaluateVerification when we asked for 30050 (fees passed to the customer)", async () => {
+  it("the official sample settles through evaluateVerification when we asked for 30050 and the customer bears the fees", async () => {
     const { provider } = harness([json(200, sample())]);
     const result = await provider.verify("re4lyvq3s3");
     if (!result.ok) throw new Error("expected ok");
@@ -263,13 +263,23 @@ describe("verify", () => {
     const decision = evaluateVerification(
       { reference: "re4lyvq3s3", amountKobo: 30_050, currency: "NGN" },
       { reference: tx.reference, status: tx.status, amountKobo: tx.amountKobo, currency: tx.currency, requestedAmountKobo: tx.requestedAmountKobo, feesKobo: tx.feesKobo },
+      "customer",
     );
     expect(decision).toEqual({ kind: "settle" });
+    // When the account bears the fees, the same answer is a mismatch.
+    expect(
+      evaluateVerification(
+        { reference: "re4lyvq3s3", amountKobo: 30_050, currency: "NGN" },
+        { reference: tx.reference, status: tx.status, amountKobo: tx.amountKobo, currency: tx.currency, requestedAmountKobo: tx.requestedAmountKobo, feesKobo: tx.feesKobo },
+        "merchant",
+      ).kind,
+    ).toBe("mismatch");
     // Asking for the paid total instead is not our attempt amount, so it must not settle.
     expect(
       evaluateVerification(
         { reference: "re4lyvq3s3", amountKobo: 99_999, currency: "NGN" },
         { reference: tx.reference, status: tx.status, amountKobo: tx.amountKobo, currency: tx.currency, requestedAmountKobo: tx.requestedAmountKobo, feesKobo: tx.feesKobo },
+        "customer",
       ).kind,
     ).toBe("mismatch");
   });

@@ -16,6 +16,8 @@ import {
   isSettlementClosed,
   pathToExpired,
   pathToVerifying,
+  isLegalObligationPath,
+  pathToPaid,
 } from "./transitions";
 
 describe("guards agree with the frozen tables for every pair", () => {
@@ -161,5 +163,35 @@ describe("isLegalPaymentPath", () => {
     expect(isLegalPaymentPath("failed", ["processing"])).toBe(false);
     expect(isLegalPaymentPath("successful", ["reversed"])).toBe(true);
     expect(isLegalPaymentPath("verifying", [])).toBe(true);
+  });
+});
+
+describe("pathToPaid", () => {
+  it("passes a scheduled obligation through due, because there is no direct edge to paid", () => {
+    expect(pathToPaid("scheduled")).toEqual(["due", "paid"]);
+  });
+
+  it("goes straight to paid from due and from missed", () => {
+    expect(pathToPaid("due")).toEqual(["paid"]);
+    expect(pathToPaid("missed")).toEqual(["paid"]);
+  });
+
+  it("needs no step when already paid, and refuses a cancelled obligation", () => {
+    expect(pathToPaid("paid")).toEqual([]);
+    expect(pathToPaid("cancelled")).toBeNull();
+  });
+
+  it("only ever uses edges the frozen table allows, for every status", () => {
+    for (const from of OBLIGATION_STATUSES) {
+      const path = pathToPaid(from);
+      if (path === null) continue;
+      expect(isLegalObligationPath(from, path)).toBe(true);
+      if (path.length > 0) expect(path[path.length - 1]).toBe("paid");
+    }
+  });
+
+  it("isLegalObligationPath rejects the missing direct edge", () => {
+    expect(isLegalObligationPath("scheduled", ["paid"])).toBe(false);
+    expect(isLegalObligationPath("cancelled", ["paid"])).toBe(false);
   });
 });

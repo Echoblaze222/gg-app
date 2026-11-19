@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { PROVIDER_TX_STATUSES, evaluateVerification, isProviderTxStatus, type ExpectedPayment, type ProviderVerification } from "./verification";
+import {
+  FEE_BEARER_SETTING_KEY,
+  PROVIDER_TX_STATUSES,
+  evaluateVerification,
+  isProviderTxStatus,
+  parseFeeBearer,
+  type ExpectedPayment,
+  type ProviderVerification,
+} from "./verification";
 
 const expected: ExpectedPayment = { reference: "gg-0123456789ABCDEFGHJK", amountKobo: 250_000, currency: "NGN" };
 
@@ -40,41 +48,79 @@ describe("success", () => {
   });
 });
 
-describe("fees passed to the customer", () => {
+describe("fee bearer setting", () => {
   // Shape taken from the Paystack verify sample: amount 40333 = requested_amount 30050 + fees 10283.
   const withFees = { amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: 10_283 };
+  const asCustomer = (patch: Partial<ProviderVerification>) => evaluateVerification(expected, provider(patch), "customer");
 
-  it("settles when the total is exactly the requested amount plus fees", () => {
-    expect(evaluateVerification(expected, provider(withFees))).toEqual({ kind: "settle" });
+  it("parseFeeBearer is strict: only the exact word customer relaxes the rule", () => {
+    expect(parseFeeBearer("customer")).toBe("customer");
+    for (const value of ["merchant", "", "Customer", "CUSTOMER", " customer", "both", "either", null, undefined, 1, true, {}]) {
+      expect(parseFeeBearer(value)).toBe("merchant");
+    }
+    expect(FEE_BEARER_SETTING_KEY).toBe("payment.fee_bearer");
   });
 
-  it("is a mismatch when the total does not equal requested plus fees", () => {
-    expect(evaluateVerification(expected, provider({ ...withFees, amountKobo: 260_284 }))).toEqual({ kind: "mismatch", reason: "amount" });
-    expect(evaluateVerification(expected, provider({ ...withFees, amountKobo: 260_282 }))).toEqual({ kind: "mismatch", reason: "amount" });
+  it("merchant (also the default) rejects a total that includes fees", () => {
+    expect(evaluateVerification(expected, provider(withFees))).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(evaluateVerification(expected, provider(withFees), "merchant")).toEqual({ kind: "mismatch", reason: "amount" });
   });
 
-  it("is a mismatch when the requested amount is not the one we asked for", () => {
-    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: 249_999, feesKobo: 10_284 }))).toEqual({ kind: "mismatch", reason: "amount" });
+  it("merchant still settles an exact amount, even when the provider reports fees", () => {
+    expect(evaluateVerification(expected, provider({ requestedAmountKobo: 250_000, feesKobo: 10_283 }), "merchant")).toEqual({ kind: "settle" });
   });
 
-  it("is a mismatch when requested amount or fees are missing, null or invalid", () => {
-    expect(evaluateVerification(expected, provider({ amountKobo: 260_283 }))).toEqual({ kind: "mismatch", reason: "amount" });
-    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: null }))).toEqual({ kind: "mismatch", reason: "amount" });
-    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: null, feesKobo: 10_283 }))).toEqual({ kind: "mismatch", reason: "amount" });
-    expect(evaluateVerification(expected, provider({ amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: -10_283 }))).toEqual({ kind: "mismatch", reason: "amount" });
-    expect(evaluateVerification(expected, provider({ amountKobo: 260_283.5, requestedAmountKobo: 250_000, feesKobo: 10_283.5 }))).toEqual({ kind: "mismatch", reason: "amount" });
+  it("customer settles when the total is exactly the requested amount plus fees", () => {
+    expect(asCustomer(withFees)).toEqual({ kind: "settle" });
   });
 
-  it("an exact match still wins when the provider also reports requested amount and fees", () => {
-    expect(evaluateVerification(expected, provider({ requestedAmountKobo: 250_000, feesKobo: 0 }))).toEqual({ kind: "settle" });
+  it("customer is a mismatch when the total does not equal requested plus fees", () => {
+    expect(asCustomer({ ...withFees, amountKobo: 260_284 })).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(asCustomer({ ...withFees, amountKobo: 260_282 })).toEqual({ kind: "mismatch", reason: "amount" });
   });
 
-  it("a different currency is still a mismatch in the fee case", () => {
-    expect(evaluateVerification(expected, provider({ ...withFees, currency: "USD" }))).toEqual({ kind: "mismatch", reason: "currency" });
+  it("customer is a mismatch when the requested amount is not the one we asked for", () => {
+    expect(asCustomer({ amountKobo: 260_283, requestedAmountKobo: 249_999, feesKobo: 10_284 })).toEqual({ kind: "mismatch", reason: "amount" });
   });
 
-  it("reversed uses the same amount rule", () => {
-    expect(evaluateVerification(expected, provider({ ...withFees, status: "reversed" }))).toEqual({ kind: "reversed" });
+  it("customer is a mismatch when requested amount or fees are missing, null or invalid", () => {
+    expect(asCustomer({ amountKobo: 260_283 })).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(asCustomer({ amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: null })).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(asCustomer({ amountKobo: 260_283, requestedAmountKobo: null, feesKobo: 10_283 })).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(asCustomer({ amountKobo: 260_283, requestedAmountKobo: 250_000, feesKobo: -10_283 })).toEqual({ kind: "mismatch", reason: "amount" });
+    expect(asCustomer({ amountKobo: 260_283.5, requestedAmountKobo: 250_000, feesKobo: 10_283.5 })).toEqual({ kind: "mismatch", reason: "amount" });
+  });
+
+  it("customer still accepts an exact match when the provider also reports requested amount and fees", () => {
+    expect(asCustomer({ requestedAmountKobo: 250_000, feesKobo: 0 })).toEqual({ kind: "settle" });
+  });
+
+  it("a different currency is a mismatch under either setting", () => {
+    expect(asCustomer({ ...withFees, currency: "USD" })).toEqual({ kind: "mismatch", reason: "currency" });
+    expect(evaluateVerification(expected, provider({ currency: "USD" }), "merchant")).toEqual({ kind: "mismatch", reason: "currency" });
+  });
+
+  it("reversed follows the same amount rule under each setting", () => {
+    expect(asCustomer({ ...withFees, status: "reversed" })).toEqual({ kind: "reversed" });
+    expect(evaluateVerification(expected, provider({ ...withFees, status: "reversed" }), "merchant")).toEqual({ kind: "mismatch", reason: "amount" });
+  });
+
+  it("only a fully matching success settles under customer too", () => {
+    let settled = 0;
+    for (const status of [...PROVIDER_TX_STATUSES, "pending", ""]) {
+      for (const amountKobo of [250_000, 260_283, 250_001, 0]) {
+        for (const reference of [expected.reference, "other"]) {
+          const d = evaluateVerification(expected, { reference, status, currency: "NGN", amountKobo, requestedAmountKobo: 250_000, feesKobo: 10_283 }, "customer");
+          if (d.kind === "settle") {
+            settled += 1;
+            expect(status).toBe("success");
+            expect(reference).toBe(expected.reference);
+            expect([250_000, 260_283]).toContain(amountKobo);
+          }
+        }
+      }
+    }
+    expect(settled).toBe(2);
   });
 });
 
