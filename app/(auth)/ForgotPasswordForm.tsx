@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { Button, Input, SuccessState } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
+import { EnvelopeSent } from "@/components/motion/EnvelopeSent";
 import { FormAlert } from "./FormAlert";
 import { IDLE, type AuthFormState } from "./form-state";
 
@@ -15,9 +16,12 @@ export function ForgotPasswordForm({ action }: ForgotPasswordFormProps) {
 
   if (state.status === "success") {
     return (
-      <SuccessState title="Check your email" action={<Link href="/login" className="auth__link">Back to log in</Link>}>
-        {state.message}
-      </SuccessState>
+      <div className="auth__sent">
+        <EnvelopeSent state="sent" message="Email sent. Check your inbox." />
+        <h2 className="auth__sent-title">Check your email</h2>
+        <p className="auth__subtitle">{state.message}</p>
+        <Link href="/login" className="auth__link">Back to log in</Link>
+      </div>
     );
   }
 

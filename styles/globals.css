@@ -16,6 +16,7 @@
 @import "./components/auth.css";
 @import "./components/receipt-printer.css";
 @import "./components/payment-stages.css";
+@import "./components/auth-motion.css";
 
 @layer base {
   html {
