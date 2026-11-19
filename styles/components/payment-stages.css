@@ -1,0 +1,446 @@
+/*
+ * Payment stages: a card on the left, a ledger row on the right, one coin that travels between them.
+ * Monochrome line and fill; status colors only for success (check), pending (hourglass, dashed coin) and error (card outline).
+ * Only transform and opacity animate (stroke-dashoffset for the check). Each stage starts where the one before ended.
+ * Reduced motion shows the end of each stage at once.
+ */
+@layer components {
+  .pay {
+    --track: 148px;
+    --coin: 20px;
+    --run: calc(var(--track) - var(--coin));
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    margin: 0;
+  }
+
+  .pay__scene {
+    display: grid;
+    grid-template-columns: 64px var(--track) 84px;
+    align-items: center;
+    column-gap: var(--space-2);
+    height: 96px;
+    color: var(--color-ink);
+  }
+
+  /* ---- card ---- */
+  .pay__card {
+    position: relative;
+    display: grid;
+    border-radius: 8px;
+    transition: color 200ms var(--ease-standard);
+  }
+
+  .pay__lock {
+    position: absolute;
+    right: 4px;
+    bottom: 3px;
+    display: none;
+    padding: 3px;
+    border-radius: 50%;
+    background: var(--color-surface);
+  }
+
+  .pay__shackle {
+    transform-origin: 13px 9px;
+  }
+
+  /* ---- track ---- */
+  .pay__track {
+    position: relative;
+    height: 100%;
+  }
+
+  .pay__track::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 2px dashed color-mix(in srgb, var(--color-ink) 22%, transparent);
+  }
+
+  .pay__ring {
+    position: absolute;
+    left: calc(var(--run) * 0.25 - 10px);
+    top: calc(50% - 20px);
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--color-ink);
+    border-radius: 50%;
+    opacity: 0;
+  }
+
+  .pay__dot {
+    position: absolute;
+    top: calc(50% - 4px);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-ink) 22%, transparent);
+  }
+
+  .pay__dot--1 { left: calc(var(--run) * 0.25 + 6px); }
+  .pay__dot--2 { left: calc(var(--run) * 0.5 + 6px); }
+  .pay__dot--3 { left: calc(var(--run) * 0.75 + 6px); }
+
+  .pay__coin {
+    position: absolute;
+    left: 0;
+    top: calc(50% - var(--coin) / 2);
+    width: var(--coin);
+    height: var(--coin);
+    border-radius: 50%;
+    background: var(--color-ink);
+    box-shadow: inset 0 0 0 4px var(--color-surface), inset 0 0 0 6px var(--color-ink);
+    transform: translateX(0);
+  }
+
+  /* ---- hourglass (pending, taking long) ---- */
+  .pay__glass {
+    position: absolute;
+    left: calc(50% - 14px);
+    top: calc(50% - 20px);
+    display: none;
+    width: 28px;
+    height: 40px;
+    background: var(--color-pending-surface);
+    border: 2px solid var(--color-pending);
+    clip-path: polygon(0 0, 100% 0, 58% 50%, 100% 100%, 0 100%, 42% 50%);
+  }
+
+  .pay__sand {
+    position: absolute;
+    left: calc(50% - 1px);
+    top: 14px;
+    width: 2px;
+    height: 14px;
+    background: var(--color-pending);
+  }
+
+  /* ---- ledger row ---- */
+  .pay__ledger {
+    position: relative;
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    height: 52px;
+    padding: 0 10px;
+    overflow: hidden;
+    border: 2px solid var(--color-ink);
+    border-radius: 8px;
+    background: var(--color-surface);
+  }
+
+  .pay__row {
+    height: 6px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--color-ink) 70%, transparent);
+  }
+
+  .pay__row--short {
+    width: 55%;
+    background: color-mix(in srgb, var(--color-ink) 28%, transparent);
+  }
+
+  .pay__scan {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 3px;
+    background: var(--color-ink);
+    opacity: 0;
+  }
+
+  .pay__check {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    padding: 4px;
+    border-radius: 50%;
+    background: var(--color-success-surface);
+    color: var(--color-success);
+    opacity: 0;
+  }
+
+  .pay__check path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+
+  /* ---- text ---- */
+  .pay__text {
+    display: grid;
+    gap: var(--space-1);
+    max-width: 34ch;
+    text-align: center;
+  }
+
+  .pay__headline {
+    font-weight: var(--weight-medium);
+  }
+
+  .pay__action,
+  .pay__elapsed {
+    color: var(--color-ink-muted);
+    font-size: var(--text-sm);
+  }
+
+  .pay__money {
+    justify-self: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-ink) 8%, transparent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  /* ---- stages ---- */
+  .pay[data-state="initiating"] .pay__ring,
+  .pay[data-state="awaiting_auth"] .pay__ring,
+  .pay[data-state="processing"] .pay__ring {
+    opacity: 1;
+  }
+
+  .pay[data-state="initiating"] .pay__ring {
+    animation: pay-ring-in 500ms var(--ease-enter) both;
+  }
+
+  .pay[data-state="initiating"] .pay__coin {
+    animation: pay-initiating 700ms var(--ease-standard) forwards;
+  }
+
+  .pay[data-state="awaiting_auth"] .pay__coin {
+    transform: translateX(calc(var(--run) * 0.25));
+  }
+
+  .pay[data-state="awaiting_auth"] .pay__ring {
+    animation: pay-pulse 1400ms ease-in-out infinite alternate;
+  }
+
+  .pay[data-state="awaiting_auth"] .pay__lock {
+    display: block;
+  }
+
+  .pay[data-state="processing"] .pay__coin {
+    animation: pay-processing 1800ms var(--ease-standard) forwards;
+  }
+
+  .pay[data-state="processing"] .pay__lock {
+    display: block;
+  }
+
+  .pay[data-state="processing"] .pay__shackle {
+    animation: pay-unlock 400ms var(--ease-standard) forwards;
+  }
+
+  .pay[data-state="processing"] .pay__dot--1 { animation: pay-dot 200ms ease-out 0.35s forwards; }
+  .pay[data-state="processing"] .pay__dot--2 { animation: pay-dot 200ms ease-out 0.9s forwards; }
+  .pay[data-state="processing"] .pay__dot--3 { animation: pay-dot 200ms ease-out 1.45s forwards; }
+
+  .pay[data-state="verifying"] .pay__coin {
+    animation: pay-verifying 700ms var(--ease-standard) forwards;
+  }
+
+  .pay[data-state="verifying"] .pay__dot,
+  .pay[data-state="successful"] .pay__dot {
+    background: var(--color-ink);
+  }
+
+  .pay[data-state="verifying"] .pay__scan {
+    animation: pay-scan 900ms linear 0.5s 3 forwards;
+  }
+
+  .pay[data-state="successful"] .pay__coin {
+    opacity: 0;
+    transform: translateX(var(--run)) scale(0);
+  }
+
+  .pay[data-state="successful"] .pay__ledger {
+    animation: pay-stamp 400ms var(--ease-emphasized) both;
+    border-color: var(--color-success);
+  }
+
+  .pay[data-state="successful"] .pay__row {
+    opacity: 0.25;
+  }
+
+  .pay[data-state="successful"] .pay__check {
+    opacity: 1;
+  }
+
+  .pay[data-state="successful"] .pay__check path {
+    animation: pay-check 400ms var(--ease-enter) 0.3s forwards;
+  }
+
+  .pay[data-state="pending_long"] .pay__coin {
+    transform: translateX(calc(var(--run) * 0.75));
+    background: var(--color-surface);
+    box-shadow: inset 0 0 0 2px var(--color-pending);
+  }
+
+  .pay[data-state="pending_long"] .pay__glass {
+    display: block;
+    animation: pay-flip 8s ease-in-out infinite;
+  }
+
+  .pay[data-state="pending_long"] .pay__sand {
+    animation: pay-sand 2s linear infinite;
+  }
+
+  .pay[data-state="pending_long"] .pay__ledger {
+    border-color: var(--color-pending);
+    border-style: dashed;
+  }
+
+  /* Failed, no money moved: the coin bounces back to the card. */
+  .pay[data-state="failed"] .pay__card {
+    color: var(--color-error);
+  }
+
+  .pay[data-state="failed"][data-money="no"] .pay__coin {
+    animation: pay-return 800ms var(--ease-emphasized) forwards;
+  }
+
+  .pay[data-state="failed"]:not([data-money="no"]) .pay__coin {
+    transform: translateX(calc(var(--run) * 0.75));
+    background: var(--color-surface);
+    box-shadow: inset 0 0 0 2px var(--color-pending);
+  }
+
+  .pay[data-state="failed"]:not([data-money="no"]) .pay__ledger {
+    border-color: var(--color-pending);
+    border-style: dashed;
+  }
+
+  /* Cancelled or expired: the ring closes and fades, the coin goes home. */
+  .pay[data-state="cancelled"] .pay__ring,
+  .pay[data-state="expired"] .pay__ring {
+    animation: pay-ring-out 600ms var(--ease-exit) forwards;
+  }
+
+  .pay[data-state="cancelled"] .pay__coin,
+  .pay[data-state="expired"] .pay__coin {
+    animation: pay-home 700ms var(--ease-standard) forwards;
+  }
+
+  @keyframes pay-ring-in {
+    from { opacity: 0; transform: scale(0.4); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes pay-ring-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.5); }
+  }
+
+  @keyframes pay-pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.12); }
+  }
+
+  @keyframes pay-initiating {
+    0% { transform: translateX(0) translateY(0); }
+    45% { transform: translateX(calc(var(--run) * 0.12)) translateY(-16px); }
+    100% { transform: translateX(calc(var(--run) * 0.25)) translateY(0); }
+  }
+
+  @keyframes pay-processing {
+    from { transform: translateX(calc(var(--run) * 0.25)); }
+    to { transform: translateX(calc(var(--run) * 0.75)); }
+  }
+
+  @keyframes pay-verifying {
+    0% { transform: translateX(calc(var(--run) * 0.75)) scale(1); opacity: 1; }
+    100% { transform: translateX(var(--run)) scale(0.6); opacity: 0.4; }
+  }
+
+  @keyframes pay-return {
+    0% { transform: translateX(calc(var(--run) * 0.25)); }
+    60% { transform: translateX(calc(var(--run) * -0.04)); }
+    80% { transform: translateX(calc(var(--run) * 0.03)); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes pay-home {
+    from { transform: translateX(calc(var(--run) * 0.25)); opacity: 1; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes pay-unlock {
+    from { transform: translateY(0); }
+    to { transform: translateY(-3px) rotate(-18deg); }
+  }
+
+  @keyframes pay-dot {
+    from { background: color-mix(in srgb, var(--color-ink) 22%, transparent); }
+    to { background: var(--color-ink); }
+  }
+
+  @keyframes pay-scan {
+    0% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 1; transform: translateX(70px); }
+  }
+
+  @keyframes pay-stamp {
+    0% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes pay-check {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes pay-flip {
+    0%, 85% { transform: rotate(0deg); }
+    100% { transform: rotate(180deg); }
+  }
+
+  @keyframes pay-sand {
+    from { transform: translateY(-4px); opacity: 1; }
+    to { transform: translateY(8px); opacity: 0.2; }
+  }
+
+  /* Reduced motion: the end of each stage at once, same text. */
+  @media (prefers-reduced-motion: reduce) {
+    .pay *,
+    .pay__ledger {
+      animation: none !important;
+    }
+    .pay[data-state="initiating"] .pay__coin,
+    .pay[data-state="awaiting_auth"] .pay__coin {
+      transform: translateX(calc(var(--run) * 0.25));
+    }
+    .pay[data-state="processing"] .pay__coin {
+      transform: translateX(calc(var(--run) * 0.75));
+    }
+    .pay[data-state="verifying"] .pay__coin {
+      transform: translateX(var(--run)) scale(0.6);
+      opacity: 0.4;
+    }
+    .pay[data-state="verifying"] .pay__scan {
+      opacity: 0;
+    }
+    .pay[data-state="successful"] .pay__check path {
+      stroke-dashoffset: 0;
+    }
+    .pay[data-state="processing"] .pay__dot {
+      background: var(--color-ink);
+    }
+    .pay[data-state="processing"] .pay__shackle {
+      transform: translateY(-3px) rotate(-18deg);
+    }
+    .pay[data-state="cancelled"] .pay__ring,
+    .pay[data-state="expired"] .pay__ring {
+      opacity: 0;
+    }
+    .pay[data-state="cancelled"] .pay__coin,
+    .pay[data-state="expired"] .pay__coin,
+    .pay[data-state="failed"][data-money="no"] .pay__coin {
+      transform: translateX(0);
+    }
+  }
+}

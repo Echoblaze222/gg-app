@@ -15,6 +15,7 @@
 @import "./components/tilt.css";
 @import "./components/auth.css";
 @import "./components/receipt-printer.css";
+@import "./components/payment-stages.css";
 
 @layer base {
   html {

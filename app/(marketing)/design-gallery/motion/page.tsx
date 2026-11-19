@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ReceiptPrinterDemo } from "../MotionDemos";
+import { PaymentStagesDemo, ReceiptPrinterDemo } from "../MotionDemos";
 
 export const metadata: Metadata = { title: "Design gallery: motion", robots: { index: false, follow: false } };
 
@@ -16,6 +16,15 @@ export default function MotionGalleryPage() {
           Every animation follows a real state from the server and has a text status and a reduced motion version.
         </p>
       </header>
+      <section className="grid gap-6" aria-labelledby="gallery-stages">
+        <h2 id="gallery-stages" className="text-2xl">
+          Payment stages
+        </h2>
+        <p className="text-sm text-ink-muted">
+          One coin travels from the card to the ledger row. Success is drawn only for the successful state. A failure shows the server&rsquo;s message and whether money moved. Taking long shows a calm hourglass, never an endless spinner.
+        </p>
+        <PaymentStagesDemo />
+      </section>
       <section className="grid gap-6" aria-labelledby="gallery-printer">
         <h2 id="gallery-printer" className="text-2xl">
           Receipt printer
