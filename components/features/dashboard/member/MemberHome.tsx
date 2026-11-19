@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Button, ProgressRing, TimelinePills } from "@/components/ui";
+import type { TimelineStatus } from "@/components/ui";
 import type { NoDueReason } from "@/lib/member/home";
 import { describeDays, formatDay } from "@/lib/dashboard/display";
 import type { MemberHomeData } from "@/lib/dashboard/home-loader";
 import { paidShare } from "@/lib/dashboard/schedule";
+import type { PillStatus } from "@/lib/dashboard/schedule";
 import { EmptyState } from "../states";
 import { Tile } from "../Tile";
 
@@ -12,6 +14,16 @@ const NO_DUE: Record<NoDueReason, { title: string; body: string }> = {
   plan_paused: { title: "Your plan is paused", body: "Nothing will fall due while your plan is paused." },
   nothing_due: { title: "Nothing due right now", body: "Your next contribution shows here before it is due." },
 };
+
+/** The schedule has five states, the timeline pills have four. A due entry is drawn as pending and worded "Due"; a missed entry is drawn as overdue. */
+const TIMELINE_STATUS: Record<PillStatus, TimelineStatus> = {
+  paid: "paid",
+  due: "pending",
+  overdue: "overdue",
+  upcoming: "upcoming",
+  missed: "overdue",
+};
+const TIMELINE_LABELS = { pending: "Due" } as const;
 
 /**
  * Presentation only. Every number, status and rule comes from AI-5's lib/member (HomeView), so this file never decides what a value means.
@@ -101,7 +113,11 @@ export function MemberHome({ data }: { data: MemberHomeData }) {
             return (
               <>
                 {share ? <ProgressRing value={share.paid} max={share.total} label="Share of the shown contributions that are paid" caption={`${share.paid} of ${share.total} shown are paid`} /> : null}
-                <TimelinePills label="Contribution schedule" items={pills.map((p) => ({ id: p.id, date: formatDay(p.dueOn), label: p.amount, status: p.status, current: p.id === currentId }))} />
+                <TimelinePills
+                  label="Contribution schedule"
+                  statusLabels={TIMELINE_LABELS}
+                  items={pills.map((p) => ({ id: p.id, date: formatDay(p.dueOn), label: p.amount, status: TIMELINE_STATUS[p.status], current: p.id === currentId }))}
+                />
               </>
             );
           }}
