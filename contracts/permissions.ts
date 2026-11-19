@@ -44,6 +44,7 @@ export const PERMISSIONS = [
   "admin.audit.read",
   "admin.settings.read",
   "admin.settings.update",
+  "admin.limits.update",
   "admin.policies.manage",
   "admin.privacy.manage",
 ] as const;
@@ -55,7 +56,9 @@ const MEMBER_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith("member.")) as
 /** Default role to permission mapping seeded by migrations. Least privilege: support cannot touch money or roles. */
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, readonly PermissionName[]> = {
   owner: PERMISSIONS,
-  admin: PERMISSIONS.filter((p) => p !== "admin.roles.manage" && p !== "admin.ledger.adjust" && p !== "admin.settings.update"),
+  admin: PERMISSIONS.filter(
+    (p) => p !== "admin.roles.manage" && p !== "admin.ledger.adjust" && p !== "admin.settings.update" && p !== "admin.limits.update",
+  ),
   support: ["admin.members.read", "admin.support.read", "admin.support.reply", "admin.announcements.manage"],
   member: MEMBER_PERMISSIONS,
 };
@@ -69,6 +72,7 @@ export const REAUTH_REQUIRED_PERMISSIONS = [
   "admin.reconciliation.resolve",
   "admin.roles.manage",
   "admin.settings.update",
+  "admin.limits.update",
   "member.payout.request",
   "member.security.manage",
 ] as const satisfies readonly PermissionName[];

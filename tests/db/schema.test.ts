@@ -122,7 +122,14 @@ describe("seeded roles and permissions match contracts/permissions.ts", () => {
   it("the default settings the owner can change exist", async () => {
     const rows = await q<{ key: string }>("select key from app_settings");
     expect(rows.map((r) => r.key).sort()).toEqual(
-      ["contribution.max_kobo", "contribution.min_kobo", "payout.min_kobo", "payout.otp_max_attempts", "payout.otp_ttl_seconds"].sort(),
+      [
+        "contribution.max_kobo",
+        "contribution.min_kobo",
+        "member.balance.max_kobo",
+        "payout.min_kobo",
+        "payout.otp_max_attempts",
+        "payout.otp_ttl_seconds",
+      ].sort(),
     );
   });
 });
