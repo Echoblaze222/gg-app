@@ -61,6 +61,7 @@ export const LEDGER_ENTRY_TYPES = [
   "refund_debit",
   "adjustment_credit",
   "adjustment_debit",
+  "payment_reversal_debit",
 ] as const;
 export type LedgerEntryType = (typeof LEDGER_ENTRY_TYPES)[number];
 
