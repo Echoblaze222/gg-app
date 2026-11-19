@@ -5,13 +5,9 @@ GG Contribution is a savings platform. One owner runs it as the single administr
 
 Confirmed by the owner: Paystack as processor, naira only, Next.js with Supabase Postgres.
 
-Still unanswered (the design keeps these configurable and never hard codes them):
-- What happens on a missed contribution (penalty, grace days, trust score change).
-- Refund policy and who may refund.
-- Whether identity verification (BVN or NIN) is required.
-- Whether the manual bank transfer channel from the legacy app stays.
-- Migration of existing legacy users.
-- Late fees, minimum and maximum contribution, and minimum payout.
+Decided: identity numbers (BVN or NIN) are not collected, see ADR-013. A member may hold at most 500,000 naira, configurable, see ADR-014. Missed contributions, refunds, reversals, the manual transfer channel and legacy user migration have accepted defaults in ADR-015.
+
+Still open (kept configurable, never hard coded): exact minimum contribution, minimum payout, grace days and the card cooling period. The owner can overturn any default with a new ADR.
 
 Legal flag: holding member money and paying it out on request may count as a regulated activity in Nigeria. This is not legal advice. The launch gate in `07-FINISHING-PHASE.md` section 5 stays blocking.
 

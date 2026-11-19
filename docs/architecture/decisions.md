@@ -15,7 +15,7 @@ No floats. Balance is the sum of immutable ledger entries, not a column that is 
 The owner said there is one administrator. The schema still uses roles and permissions (`owner`, `admin`, `support`, `member`) so a second admin or a support person can be added later without a migration.
 
 ## ADR-005 Contribution means personal savings with withdrawal requests
-Members save on a daily, weekly or monthly schedule with any amount, and later request their money back. Each withdrawal is verified and approved by the owner. This is not a rotating (ajo or esusu) pool and not donations. Rules the owner has not answered (missed contribution handling, refunds policy, limits, BVN or NIN) are stored as configuration, not hard coded.
+Members save on a daily, weekly or monthly schedule with any amount, and later request their money back. Each withdrawal is verified and approved by the owner. This is not a rotating (ajo or esusu) pool and not donations. Rules the owner has not answered (missed contribution handling, refunds policy, limits) are stored as configuration, not hard coded.
 
 ## ADR-006 Payment attempt states follow the AI-4 brief
 `initiating`, `awaiting_authentication`, `processing`, `verifying`, `successful`, `failed`, `cancelled`, `expired`, plus `reversed` after success. `idle` is a client only state. Added `reversed` because the pack lists reversed payments as an edge case.
@@ -37,6 +37,25 @@ Next.js 16 renamed `middleware` to `proxy`. `proxy.ts` is correct. It only refre
 
 ## ADR-012 First push was made without lockfile, spec pack and images
 The first push to GitHub used the GitHub API, which cannot upload a 330 KB lockfile or binary images. `package-lock.json`, `RESEARCH.md`, `source-pack/`, `ai-briefs/` and `assets/` were therefore not part of it. Dependencies are exact-pinned in `package.json`, so the first `npm install` (for example on Vercel) produces a lockfile. Commit that lockfile as soon as it exists. The spec pack stays in the owner's zip files.
+
+## ADR-013 No BVN or NIN collection
+Decided by the owner on 2026-11-16: the platform does not collect BVN or NIN. No identity-number column exists in the schema and none may be added without a new ADR. Member identity rests on verified email, phone, the owner approving each withdrawal, and the payout step-up code.
+
+## ADR-014 Savings cap per member, and a permission to change limits
+Decided by the owner on 2026-11-18. The first members are students, so no member may hold a large balance: the cap is 500,000 naira (`member.balance.max_kobo` = 50000000 kobo) and the largest single contribution is the same amount. The owner raises it over time. Limits are configuration, not code.
+- Enforced by the database. A trigger on `payment_attempts` (migration 1960) refuses a contribution attempt when ledger balance plus contributions still in flight plus the new amount would pass the cap. It takes the same row lock as `ledger_post`, so two simultaneous attempts cannot both fit. A missing or unreadable cap blocks the attempt.
+- The check is made when the attempt is created, never when the credit is posted, so money the provider has already taken is never refused. Withdrawing frees room to save again. Lowering the cap never reduces an existing balance; the member cannot add more until they are under it.
+- Card authorizations are not savings and are not counted.
+- The error is `PAYMENT_AMOUNT_INVALID` with detail `member_balance_limit`. A dedicated contract error with clearer copy for members can be added as an additive contract change.
+- New permission `admin.limits.update` covers money limits (`member.balance.max_kobo`, `contribution.*`, `payout.min_kobo`). Owner only by default. It is separate from `admin.settings.update` so the owner can later give limit control to a trusted admin role without giving them every setting. It is in the reauthentication list.
+
+## ADR-015 Money policy choices (owner said: choose the better option)
+On 2026-11-18 the owner asked for the better option on each open product question. These are the accepted defaults. A later ADR can change any of them. The legal review before launch still stands.
+- **Reversals.** A `reversed` payment must take its credit back out. Add a reversal debit entry type, unique per payment attempt like the credit. While a provider reversal is pending, hold the amount. If the member has already withdrawn it, record a shortfall that blocks further payouts, instead of letting the balance go negative. Optionally keep card funded money in a configurable cooling period before it can be withdrawn, to cover the card dispute window (about 120 days). Not built yet; the two `it.todo` entries in the database tests mark it.
+- **Manual bank transfer.** Dropped. Paystack already handles bank transfer payments, and a hand confirmed channel replaces provider verification with one admin click. Supersedes ADR-011. The `manual_transfer` channel is removed in a breaking contract bump before AI-4 builds on it.
+- **Missed contributions.** No money penalty and no late fee: this is personal savings, so a miss harms no other member. Configurable grace days, reminders, and an automatic pause of the plan after a set number of misses. Trust scores are out of scope.
+- **Refunds.** Only holders of `admin.payments.refund` (owner and admin), with a written reason, behind the `refund.enabled` switch, never above the original payment. A refund removes money from the member's balance through a ledger debit.
+- **Legacy users.** Import profiles only. The legacy `total_saved` was written from the browser, so it is not trusted as a balance. Opening balances are posted as owner approved adjustment credits, each with a written reason, after the owner reconciles them against real bank and Paystack records. Existing members get the privacy notice, accept the current policies again and reset their password at first sign in.
 
 ## Accepted audit findings (dependencies)
 After the Next.js upgrade, `npm audit` reports only moderate findings in lint tooling (`@typescript-eslint`, `minimatch`, `eslint-config-next`) and one moderate in `baseline-browser-mapping` (build time browser data). None run in production request paths. Revisit at the finishing phase dependency audit.

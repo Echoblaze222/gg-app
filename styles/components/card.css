@@ -1,0 +1,19 @@
+@layer components {
+  .card {
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+  }
+  .card--lg {
+    padding: var(--space-8);
+  }
+  .card--surface {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+    box-shadow: var(--shadow-sm);
+  }
+  /* The black hero card gets its colors from [data-surface="ink"] in tokens.css. */
+  .card--ink {
+    box-shadow: var(--shadow-md);
+  }
+}
