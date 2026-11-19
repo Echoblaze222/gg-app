@@ -94,7 +94,6 @@ describe("I3: a confirmed payment produces exactly one credit", () => {
     expect(new Set(rows.map((r) => r.receipt_number)).size).toBe(3);
   });
 
-  it.todo("a reversed payment (successful to reversed) removes its credit from the balance. The ledger has no entry type for it yet, see PR notes");
 });
 
 describe("I1: the ledger is append only", () => {
