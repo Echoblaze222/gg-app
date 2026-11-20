@@ -1,4 +1,4 @@
-import { daysBetween, isIsoDate } from "@/lib/member/dates";
+import { daysBetween, isIsoDate, lagosDateOf, lagosTimeOf } from "@/lib/member/dates";
 
 /** "2026-11-21" -> "Sat 21 Nov". Invalid dates are shown as unavailable, never guessed. */
 export function formatDay(iso: string): string {
@@ -16,3 +16,12 @@ export function describeDays(daysUntil: number): string {
 }
 
 export { daysBetween };
+
+/** "Sat 21 Nov, 14:05" in Lagos time. An unreadable timestamp is shown as unavailable, never guessed. */
+export function formatStamp(timestamp: string): string {
+  try {
+    return `${formatDay(lagosDateOf(timestamp))}, ${lagosTimeOf(timestamp)}`;
+  } catch {
+    return "Time unavailable";
+  }
+}

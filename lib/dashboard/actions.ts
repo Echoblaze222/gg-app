@@ -5,7 +5,9 @@ import { AppError } from "@/contracts/errors";
 import type { Result } from "@/contracts/errors";
 import { initiatePaymentInputSchema } from "@/contracts/schemas";
 import type { InitiatePaymentOutput } from "@/contracts/services";
-import type { PaymentAttempt } from "@/contracts/entities";
+import type { Notification, Page, PaymentAttempt } from "@/contracts/entities";
+import { loadHistoryPage } from "./history-loader";
+import type { HistoryPageData } from "./history-loader";
 import { REFERENCE_PATTERN } from "@/lib/payments/callback";
 import { buildRequestContext } from "./context";
 import { safe } from "./safe";
@@ -71,4 +73,46 @@ export async function getAttemptAction(input: { attemptId: string }): Promise<Re
   if (!services) return failure("SYSTEM_UNAVAILABLE", ctx.requestId);
   if (typeof input?.attemptId !== "string" || input.attemptId.length === 0) return failure("VALIDATION_FAILED", ctx.requestId);
   return safe(ctx.requestId, () => services.payments.getAttempt(ctx, { attemptId: input.attemptId }));
+}
+
+const validCursor = (c: unknown): c is string | null => c === null || (typeof c === "string" && c.length > 0 && c.length <= 500);
+
+/** Next page of payment history for the "Load more" button. */
+export async function loadHistoryPageAction(input: { cursor: string | null }): Promise<Result<HistoryPageData>> {
+  const ctx = await buildRequestContext();
+  const services = getDashboardServices();
+  if (!services) return failure("SYSTEM_UNAVAILABLE", ctx.requestId);
+  if (!validCursor(input?.cursor)) return failure("VALIDATION_FAILED", ctx.requestId);
+  return loadHistoryPage(services, ctx, input.cursor);
+}
+
+export async function listNotificationsAction(input: { cursor: string | null }): Promise<Result<Page<Notification>>> {
+  const ctx = await buildRequestContext();
+  const services = getDashboardServices();
+  if (!services) return failure("SYSTEM_UNAVAILABLE", ctx.requestId);
+  if (!validCursor(input?.cursor)) return failure("VALIDATION_FAILED", ctx.requestId);
+  return safe(ctx.requestId, () => services.notifications.list(ctx, { limit: 20, cursor: input.cursor }));
+}
+
+export async function unreadCountAction(): Promise<Result<number>> {
+  const ctx = await buildRequestContext();
+  const services = getDashboardServices();
+  if (!services) return failure("SYSTEM_UNAVAILABLE", ctx.requestId);
+  return safe(ctx.requestId, () => services.notifications.unreadCount(ctx));
+}
+
+/** The service validates ids and the member id comes from the session, never from here. */
+export async function markReadAction(input: { ids: string[] }): Promise<Result<void>> {
+  const ctx = await buildRequestContext();
+  const services = getDashboardServices();
+  if (!services) return failure("SYSTEM_UNAVAILABLE", ctx.requestId);
+  if (!Array.isArray(input?.ids) || input.ids.length === 0 || input.ids.length > 100 || input.ids.some((i) => typeof i !== "string")) return failure("VALIDATION_FAILED", ctx.requestId);
+  return safe(ctx.requestId, () => services.notifications.markRead(ctx, { ids: input.ids }));
+}
+
+export async function markAllReadAction(): Promise<Result<void>> {
+  const ctx = await buildRequestContext();
+  const services = getDashboardServices();
+  if (!services) return failure("SYSTEM_UNAVAILABLE", ctx.requestId);
+  return safe(ctx.requestId, () => services.notifications.markAllRead(ctx));
 }
