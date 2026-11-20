@@ -130,7 +130,7 @@ export function NotificationCenter({ initial }: NotificationCenterProps) {
       ) : null}
 
       {state.items.length === 0 ? (
-        <EmptyState title="No notifications yet" icon="bell">
+        <EmptyState title="No notifications yet">
           Reminders, payment updates and security alerts show here.
         </EmptyState>
       ) : (
