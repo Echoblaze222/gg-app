@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Alert, Button, DataTable, EmptyState, StatusIcon } from "@/components/ui";
-import type { Column, Tone } from "@/components/ui";
+import { Alert, Button, DataTable } from "@/components/ui";
+import type { DataColumn, Tone } from "@/components/ui";
+import { StatusIcon } from "@/components/ui/StatusIcon";
 import type { AppErrorShape } from "@/contracts/errors";
 import { loadHistoryPageAction } from "@/lib/dashboard/actions";
 import { describeError } from "@/lib/dashboard/describe-error";
@@ -15,7 +16,7 @@ import type { StatusTone } from "@/lib/member/payment-status";
 
 const TONE: Record<StatusTone, Tone> = { success: "success", pending: "pending", failure: "error", neutral: "info", warning: "warning" };
 
-const columns: Column<HistoryRow>[] = [
+const columns: DataColumn<HistoryRow>[] = [
   { key: "date", header: "Date", cell: (r) => formatDay(r.dateLagos) },
   {
     key: "payment",
@@ -88,13 +89,10 @@ export function HistoryList({ initial }: { initial: HistoryPageData }) {
       <DataTable
         caption="Payment history, newest first"
         columns={columns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        empty={
-          <EmptyState title="No payments yet" icon="receipt">
-            Payments you make show here with their status. A receipt appears once a payment is confirmed.
-          </EmptyState>
-        }
+        rows={[...rows]}
+        getRowId={(r) => r.id}
+        emptyTitle="No payments yet"
+        emptyText="Payments you make show here with their status. A receipt appears once a payment is confirmed."
       />
       {skipped > 0 ? (
         <Alert tone="warning" title="Some payments are not shown">

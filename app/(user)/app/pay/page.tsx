@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Card, EmptyState, ErrorState } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { EmptyState, ErrorState } from "@/components/features/dashboard/states";
 import { NotConnected } from "@/components/features/dashboard/NotConnected";
 import { PayController } from "@/components/features/dashboard/member/PayController";
 import { RetryButton } from "@/components/features/dashboard/RetryButton";
@@ -77,7 +78,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
     return (
       <Shell>
         <Card>
-          <EmptyState title={wanted !== null && obligation ? "This payment is out of date" : "Nothing to pay right now"} icon="card" action={<Link href="/app" className="btn btn--secondary">Back to home</Link>}>
+          <EmptyState title={wanted !== null && obligation ? "This payment is out of date" : "Nothing to pay right now"} action={<Link href="/app" className="btn btn--secondary">Back to home</Link>}>
             {wanted !== null && obligation ? "Your next contribution changed since you opened this page. Go back to home to see the current one." : "You have no contribution due. Nothing was charged."}
           </EmptyState>
         </Card>

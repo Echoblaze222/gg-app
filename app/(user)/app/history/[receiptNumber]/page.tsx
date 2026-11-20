@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Card, ErrorState } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { ErrorState } from "@/components/features/dashboard/states";
 import { NotConnected } from "@/components/features/dashboard/NotConnected";
 import { PrintButton } from "@/components/features/dashboard/member/PrintButton";
 import { RetryButton } from "@/components/features/dashboard/RetryButton";

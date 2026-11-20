@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Card, ErrorState } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { ErrorState } from "@/components/features/dashboard/states";
 import { NotificationCenter } from "@/components/features/dashboard/member/NotificationCenter";
 import { NotConnected } from "@/components/features/dashboard/NotConnected";
 import { RetryButton } from "@/components/features/dashboard/RetryButton";
