@@ -1,5 +1,5 @@
 import "server-only";
-import type { AuthService, AuthorizationService, ContributionService, MemberService, NotificationService, PaymentService } from "@/contracts/services";
+import type { AuthService, AuthorizationService, ContributionService, MemberService, NotificationService, PaymentService, ReceiptService } from "@/contracts/services";
 import type { RepositoryProvider } from "@/contracts/repositories";
 
 /**
@@ -14,6 +14,7 @@ export interface DashboardServices {
   contributions: ContributionService;
   payments: PaymentService;
   notifications: NotificationService;
+  receipts: ReceiptService;
   repositories: RepositoryProvider;
 }
 
