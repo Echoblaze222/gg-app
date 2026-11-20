@@ -2,7 +2,12 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import type { AuthorizationService, RequestContext } from "@/contracts/services";
+import type { AdminMemberService } from "@/contracts/v1_1";
+import { createAdminMemberService } from "@/lib/admin/members";
 import { AuthConfigError, authLogger, composeAuth } from "@/lib/auth/composition";
+import { createSupabaseAdmin } from "@/lib/auth/supabase-admin";
+import { createAuthRepositories } from "@/lib/db/auth-repositories";
+import { createAuditService } from "@/lib/security/audit";
 
 /**
  * The one place the admin screens reach the server side services, the same way app/(auth)/auth-gateway.ts does for
@@ -21,6 +26,28 @@ export async function getAdminAuthorization(): Promise<AuthorizationService | nu
     return composeAuth({ cookieStore: await cookies(), writable: false }).authorization;
   } catch (err) {
     logAdmin("admin_authorization_unavailable", err);
+    return null;
+  }
+}
+
+/**
+ * The real member service: the permission check comes from the auth module, the data from the real members
+ * repository (service role, server only), and views and status changes are audited with the real audit service.
+ * The service checks `admin.members.read` itself before it touches the repository.
+ */
+export async function getAdminMemberService(): Promise<AdminMemberService | null> {
+  try {
+    const authorization = composeAuth({ cookieStore: await cookies(), writable: false }).authorization;
+    const repos = createAuthRepositories(createSupabaseAdmin().client);
+    const audit = createAuditService({ audit: repos.audit, logger: authLogger });
+    return createAdminMemberService({
+      repositories: { server: () => ({ members: repos.members }) },
+      authorization,
+      audit,
+      onUnexpectedError: (error, reference) => logAdmin("admin_members_unexpected", error, reference),
+    });
+  } catch (err) {
+    logAdmin("admin_members_unavailable", err);
     return null;
   }
 }

@@ -2,7 +2,7 @@ import { AppError, type Result } from "../../contracts/errors";
 import type { Member, Page, PageRequest, Uuid } from "../../contracts/entities";
 import { PRIVILEGED_ROLES, type MemberStatus, type Role } from "../../contracts/enums";
 import type { EventBus } from "../../contracts/events";
-import type { RepositoryProvider } from "../../contracts/repositories";
+import type { MemberRepository } from "../../contracts/repositories";
 import { pageRequestSchema } from "../../contracts/schemas";
 import type { AuditService, AuthorizationService, RequestContext, SessionInfo } from "../../contracts/services";
 import { canTransition } from "../../contracts/state-machines";
@@ -24,8 +24,16 @@ export const ADMIN_MEMBER_STATUS_TRANSITIONS: Record<MemberStatus, readonly Memb
   closed: [],
 };
 
+/**
+ * The only part of the repositories this service uses. A full RepositoryProvider fits, and so does the small adapter
+ * the admin gateway builds from the real members repository (lib/db/auth-repositories.ts).
+ */
+export interface MemberRepositories {
+  server(): { readonly members: MemberRepository };
+}
+
 export interface AdminMemberServiceDeps {
-  readonly repositories: RepositoryProvider;
+  readonly repositories: MemberRepositories;
   readonly authorization: AuthorizationService;
   readonly audit: AuditService;
   readonly events?: EventBus;

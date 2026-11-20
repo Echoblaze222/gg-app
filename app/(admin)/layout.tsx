@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Wordmark } from "@/components/brand";
+import { AdminNav } from "@/components/features/admin/AdminNav";
 import { OfflineNotice } from "@/components/features/OfflineNotice";
 
 /**
- * Shell for every admin screen: skip link, a slim header, the offline notice, and the main landmark.
- * It lists no navigation yet because the dashboard is the only admin screen that exists. Links to screens that
- * do not exist would be dead buttons.
+ * Shell for every admin screen: skip link, a slim header, navigation between the admin screens that exist,
+ * the offline notice, and the main landmark.
  */
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -23,6 +23,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <Wordmark />
           </Link>
           <span className="text-sm text-ink-muted">Admin</span>
+        </div>
+        <div className="mx-auto max-w-5xl pt-3">
+          <AdminNav />
         </div>
       </header>
       <div className="mx-auto max-w-5xl px-4 pt-4">
