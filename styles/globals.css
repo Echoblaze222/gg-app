@@ -19,6 +19,8 @@
 @import "./components/auth-motion.css";
 @import "./components/shell.css";
 @import "./components/dashboard.css";
+@import "./components/shell.css";
+@import "./components/dashboard.css";
 
 @layer base {
   html {
